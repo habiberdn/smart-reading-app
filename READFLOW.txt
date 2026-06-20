@@ -1,0 +1,63 @@
+Backend
+    ↓
+Extract Text
+    ↓
+NLP Analysis
+    ↓
+Store Metrics
+
+contoh :
+{
+  "word_count": 2500,
+  "sentence_count": 120,
+  "average_sentence_length": 20.8,
+  "technical_word_count": 145,
+  "difficulty_score": 78
+}
+
+rumus tingkat kesulitan :
+difficulty_score =
+    ($average_sentence_length * 0.4)
+    +
+    ($technical_word_count * 0.6);
+
+
+Ketika mahasiswa membaca : 
+    Cek :
+    tab aktif
+    scroll
+    klik
+    keyboard activity
+
+    Jika tidak ada aktivitas selama 2 menit? Pause
+
+- Dashboard Mahasiswa 
+
+Total Reading Time
+150 jam
+
+Books
+12
+
+Articles
+35
+
+Papers
+20
+
+Average Difficulty
+68
+
+- Dashboard Dosen (di kelas)
+
+Average Reading Time
+42 menit
+
+Average Difficulty
+65
+
+Most Active Student
+Budi
+
+Least Active Student
+Andi

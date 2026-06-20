@@ -1,0 +1,19 @@
+Mahasiswa
+    Join kelas
+    Membaca mandiri
+    Mengerjakan tugas bacaan
+    Melihat statistik pribadi
+    
+Dosen
+    Create kelas
+    Generate code kelas
+    Memberikan tugas bacaan
+    Melihat analytics mahasiswa
+    
+Admin
+    Kelola user
+    Suspend akun
+    Monitoring sistem
+    Memberikan bacaan umum
+
+Admin tidak perlu membuat kelas.
