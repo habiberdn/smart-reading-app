@@ -3,10 +3,9 @@ export type Role = 'mahasiswa' | 'dosen' | 'admin';
 export type User = {
     id: number;
     name: string;
-    email: string;
+    username: string;
     role: Role;
     avatar?: string;
-    email_verified_at: string | null;
     two_factor_enabled?: boolean;
     nim?: string | null;
     nidn?: string | null;

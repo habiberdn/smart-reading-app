@@ -1,5 +1,10 @@
 import { Link, router, usePage } from '@inertiajs/react';
-import { GraduationCap, LayoutGrid, Users, BookOpenCheck } from 'lucide-react';
+import {
+    GraduationCap,
+    LayoutGrid,
+    BookOpenCheck,
+    BookOpen,
+} from 'lucide-react';
 import { NavMain } from '@/components/nav-main';
 import {
     Sidebar,
@@ -16,22 +21,32 @@ import type { NavItem } from '@/types';
 import type { Role } from '@/types/auth';
 
 function useNavItems(role: Role | null | undefined): NavItem[] {
+    if (role === 'admin') {
+        return [
+            {
+                title: 'Dashboard',
+                href: '/admin/dashboard',
+                icon: LayoutGrid,
+            },
+            {
+                title: 'Kelola Dosen',
+                href: '/admin/dosen',
+                icon: GraduationCap,
+            },
+        ];
+    }
+
     if (role === 'dosen') {
         return [
             {
                 title: 'Dashboard',
-                href: dosenDashboard(),
+                href: '/dosen/dashboard',
                 icon: LayoutGrid,
             },
             {
                 title: 'Classrooms',
                 href: '/dosen/classrooms',
                 icon: GraduationCap,
-            },
-            {
-                title: 'Students',
-                href: '/dosen/students',
-                icon: Users,
             },
         ];
     }
@@ -40,18 +55,23 @@ function useNavItems(role: Role | null | undefined): NavItem[] {
         return [
             {
                 title: 'Dashboard',
-                href: mahasiswaDashboard(),
+                href: '/mahasiswa/dashboard',
                 icon: LayoutGrid,
             },
             {
-                title: 'My Class',
-                href: '/classrooms',
+                title: 'Kelas Saya',
+                href: '/mahasiswa/classrooms',
                 icon: GraduationCap,
             },
             {
-                title: 'Assignments',
+                title: 'Tugas Saya',
                 href: '/assignments',
                 icon: BookOpenCheck,
+            },
+            {
+                title: 'Bacaan Mandiri',
+                href: '/explore',
+                icon: BookOpen,
             },
         ];
     }
@@ -71,7 +91,11 @@ export function AppSidebar() {
     const navItems = useNavItems(role);
 
     const dashboardHref =
-        role === 'dosen' ? dosenDashboard() : mahasiswaDashboard();
+        role === 'admin'
+            ? '/admin/dashboard'
+            : role === 'dosen'
+              ? dosenDashboard()
+              : mahasiswaDashboard();
 
     return (
         <Sidebar collapsible="icon" variant="inset">
@@ -93,7 +117,11 @@ export function AppSidebar() {
 
             <SidebarFooter>
                 <button
-                    onClick={() => router.post('/dosen/logout', undefined, { replace: true })}
+                    onClick={() =>
+                        router.post('/logout', undefined, {
+                            replace: true,
+                        })
+                    }
                     className="w-full rounded-md px-4 py-2 text-left text-sm text-destructive transition hover:bg-muted"
                 >
                     Keluar

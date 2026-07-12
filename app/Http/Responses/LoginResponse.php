@@ -13,6 +13,7 @@ class LoginResponse implements LoginResponseContract
         $user = $request->user();
 
         $redirectTo = match ($user->role) {
+            'admin' => '/admin/dashboard',
             'dosen' => '/dosen/dashboard',
             'mahasiswa' => '/mahasiswa/dashboard',
             default => Fortify::redirects('login', '/dashboard'),

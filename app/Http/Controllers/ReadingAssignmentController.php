@@ -2,64 +2,137 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Classroom;
 use App\Models\ReadingAssignment;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Smalot\PdfParser\Parser;
 
 class ReadingAssignmentController extends Controller
 {
     /**
-     * Display a listing of the resource.
-     */
-    public function index()
-    {
-        //
-    }
-
-    /**
-     * Show the form for creating a new resource.
-     */
-    public function create()
-    {
-        //
-    }
-
-    /**
      * Store a newly created resource in storage.
      */
-    public function store(Request $request)
+    public function store(Request $request, $kode)
     {
-        //
-    }
+        $request->validate([
+            'title' => 'required|string|max:255',
+            'dueDate' => 'nullable|date',
+            'pdfFile' => 'required|file|mimes:pdf|max:10240', // Max 10MB PDF
+        ]);
 
-    /**
-     * Display the specified resource.
-     */
-    public function show(ReadingAssignment $reading_assignment)
-    {
-        //
-    }
+        $classroom = Classroom::where('kode_kelas', $kode)->firstOrFail();
 
-    /**
-     * Show the form for editing the specified resource.
-     */
-    public function edit(ReadingAssignment $reading_assignment)
-    {
-        //
-    }
+        // 1. Store the PDF file
+        $path = $request->file('pdfFile')->store('assignments', 'public');
 
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(Request $request, ReadingAssignment $reading_assignment)
-    {
-        //
+        // 2. Extract Text and Metrics using PdfExtractionService
+        $fullPath = storage_path('app/public/'.$path);
+        $extractor = new \App\Services\PdfExtractionService();
+        $extraction = $extractor->extract($fullPath);
+
+        $extractedText = $extraction['content'];
+        $wordCount = $extraction['word_count'];
+        $sentenceCount = $extraction['sentence_count'];
+        $averageSentenceLength = $extraction['average_sentence_length'];
+        $technicalWordCount = $extraction['technical_word_count'];
+
+        // Difficulty berdasarkan jumlah halaman
+        $totalHalaman = max(1, ceil($wordCount / 250));
+        $tingkatKesulitan = 'easy';
+        $difficultyScore = 15;
+
+        if ($totalHalaman > 5) {
+            $tingkatKesulitan = 'medium';
+            $difficultyScore = 50;
+        }
+        if ($totalHalaman > 15) {
+            $tingkatKesulitan = 'hard';
+            $difficultyScore = 85;
+        }
+
+        // Estimate duration
+        $estimasiDurasi = max(1, ceil($wordCount / 200)); // 200 words per minute average reading speed
+
+        // 4. Store Metrics & Data
+        ReadingAssignment::create([
+            'classroom_id' => $classroom->id,
+            'dosen_id' => Auth::id(),
+            'judul' => $request->title,
+            'deskripsi' => $request->description ?? '',
+            'file_path' => $path,
+            'file_type' => 'pdf',
+            'total_halaman' => $totalHalaman,
+            'deadline' => $request->dueDate ? Carbon::parse($request->dueDate) : null,
+            'estimasi_durasi' => $estimasiDurasi,
+            'tingkat_kesulitan' => $tingkatKesulitan,
+            'is_published' => true,
+            'published_at' => now(),
+            'content' => $extractedText,
+            'word_count' => $wordCount,
+            'sentence_count' => $sentenceCount,
+            'average_sentence_length' => $averageSentenceLength,
+            'technical_word_count' => $technicalWordCount,
+            'difficulty_score' => $difficultyScore,
+        ]);
+
+        return redirect()->back()->with('message', 'Tugas bacaan berhasil ditambahkan!');
     }
 
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(ReadingAssignment $reading_assignment)
+    public function destroy($id)
     {
-        //
+        $assignment = ReadingAssignment::findOrFail($id);
+
+        if ($assignment->dosen_id !== Auth::id()) {
+            abort(403, 'Unauthorized action.');
+        }
+
+        $assignment->delete();
+
+        return redirect()->back()->with('message', 'Tugas bacaan berhasil dihapus!');
+    }
+
+    /**
+     * Helper to extract raw text from PDF using smalot/pdfparser
+     */
+    private function extractTextFromPdf($filePath)
+    {
+        if (! file_exists($filePath)) {
+            return '';
+        }
+
+        try {
+            $parser = new Parser;
+            $pdf = $parser->parseFile($filePath);
+            $text = $pdf->getText();
+
+            // 1. Sanitize UTF-8 using iconv first (strips malformed bytes)
+            $text = @iconv('UTF-8', 'UTF-8//IGNORE', $text) ?: $text;
+
+            // 2. Remove control characters (but keep \n, \t, \r)
+            $text = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/', '', $text);
+
+            // 3. Clean up whitespace
+            $text = preg_replace('/\r\n|\r/', "\n", $text);
+            $text = preg_replace('/[ \t]+/', ' ', $text);
+            $text = preg_replace('/\n{3,}/', "\n\n", $text);
+            $text = trim($text);
+        } catch (\Exception $e) {
+            $text = '';
+        }
+
+        // Fallback if extraction yielded too little
+        if (mb_strlen($text) < 50) {
+            $text = 'Konten PDF tidak dapat diekstrak secara otomatis. Silakan baca file PDF secara langsung.';
+        }
+
+        // Final safety net: replace any remaining invalid sequences
+        $clean = @iconv('UTF-8', 'UTF-8//IGNORE//TRANSLIT', $text);
+
+        return $clean !== false ? $clean : $text;
     }
 }

@@ -27,6 +27,12 @@ class ReadingAssignment extends Model
           'tingkat_kesulitan',
           'is_published',
           'published_at',
+          'content',
+          'word_count',
+          'sentence_count',
+          'average_sentence_length',
+          'technical_word_count',
+          'difficulty_score',
       ];
   
       protected function casts(): array
@@ -36,6 +42,13 @@ class ReadingAssignment extends Model
               'published_at' => 'datetime',
               'is_published' => 'boolean',
           ];
+      }
+
+      public function getContentAttribute(?string $value): ?string
+      {
+          if ($value === null) return null;
+          $cleaned = @iconv('UTF-8', 'UTF-8//IGNORE//TRANSLIT', $value);
+          return $cleaned !== false ? $cleaned : $value;
       }
   
   

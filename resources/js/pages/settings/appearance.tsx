@@ -6,7 +6,12 @@ import { edit as editAppearance } from '@/routes/appearance';
 export default function Appearance() {
     return (
         <>
-            <Head title="Appearance settings" />
+            <Head title="Appearance settings">
+                <meta
+                    name="description"
+                    content="Sesuaikan tema dan tampilan antarmuka Smart Reading App sesuai preferensi Anda."
+                />
+            </Head>
 
             <h1 className="sr-only">Appearance settings</h1>
 

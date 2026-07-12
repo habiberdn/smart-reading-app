@@ -35,4 +35,11 @@ return [
         ],
     ],
 
+    'recommendation' => [
+        'difficulty_weight' => env('REC_DIFFICULTY_WEIGHT', 0.35),
+        'deadline_weight'   => env('REC_DEADLINE_WEIGHT', 0.25),
+        'similarity_weight' => env('REC_SIMILARITY_WEIGHT', 0.25),
+        'capacity_weight'   => env('REC_CAPACITY_WEIGHT', 0.15),
+    ],
+
 ];

@@ -51,7 +51,12 @@ export default function TwoFactorChallenge() {
 
     return (
         <>
-            <Head title="Two-factor authentication" />
+            <Head title="Two-factor authentication">
+                <meta
+                    name="description"
+                    content="Verifikasi dua faktor untuk keamanan akun Smart Reading App Anda."
+                />
+            </Head>
 
             <div className="space-y-6">
                 <Form

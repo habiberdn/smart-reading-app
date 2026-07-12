@@ -60,7 +60,8 @@ export function AppHeader({ breadcrumbs = [] }: Props) {
     const page = usePage();
     const { auth } = page.props;
     const role = auth.user?.role ?? null;
-    const dashboardHref = role === 'dosen' ? dosenDashboard() : mahasiswaDashboard();
+    const dashboardHref =
+        role === 'dosen' ? dosenDashboard() : mahasiswaDashboard();
 
     const mainNavItems: NavItem[] = [
         {

@@ -23,7 +23,12 @@ export default function Security(props: Props) {
 
     return (
         <>
-            <Head title="Security settings" />
+            <Head title="Security settings">
+                <meta
+                    name="description"
+                    content="Atur password, autentikasi dua faktor, dan passkey untuk keamanan akun Smart Reading App."
+                />
+            </Head>
 
             <h1 className="sr-only">Security settings</h1>
 

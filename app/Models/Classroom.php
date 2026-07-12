@@ -2,9 +2,7 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -16,7 +14,6 @@ class Classroom extends Model
     protected $fillable = [
         'dosen_id',
         'name',
-        'mata_kuliah',
         'semester',
         "kode_kelas",
         "deskripsi",
@@ -24,66 +21,65 @@ class Classroom extends Model
     ];
 
     protected function casts(): array
-       {
-           return [
-               'is_active' => 'boolean',
-           ];
-       }
+    {
+        return [
+            'is_active' => 'boolean',
+        ];
+    }
 
-       protected static function booted(): void
-       {
-           static::creating(function (Classroom $classroom) {
-               if (empty($classroom->kode_kelas)) {
-                   $classroom->kode_kelas = static::generateKode();
-               }
-           });
-       }
+    protected static function booted(): void
+    {
+        static::creating(function (Classroom $classroom) {
+            if (empty($classroom->kode_kelas)) {
+                $classroom->kode_kelas = static::generateKode();
+            }
+        });
+    }
 
-       public static function generateKode(): string
-       {
-           do {
-               $kode = strtoupper(Str::random(4)) . '-' . now()->year;
-           } while (static::where('kode_kelas', $kode)->exists());
+    public static function generateKode(): string
+    {
+        do {
+            $kode = strtoupper(Str::random(4)) . '-' . now()->year;
+        } while (static::where('kode_kelas', $kode)->exists());
 
-           return $kode;
-       }
+        return $kode;
+    }
 
-       public function dosen(): BelongsTo
-       {
-           return $this->belongsTo(User::class, 'dosen_id');
-       }
+    public function dosen(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'dosen_id');
+    }
 
-       public function mahasiswas(): BelongsToMany
-       {
-           return $this->belongsToMany(User::class, 'classroom_students', 'classroom_id', 'mahasiswa_id')
-                       ->withPivot('joined_at')
-                       ->orderByPivot('joined_at');
-       }
+    public function mahasiswa(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'classroom_students', 'classroom_id', 'mahasiswa_id')
+            ->withPivot('joined_at')
+            ->orderByPivot('joined_at');
+    }
 
-       public function readingAssignments(): HasMany
-       {
-           return $this->hasMany(ReadingAssignment::class, 'classroom_id');
-       }
+    public function readingAssignments(): HasMany
+    {
+        return $this->hasMany(ReadingAssignment::class, 'classroom_id');
+    }
 
-       /** Shortcut: tugas yang sudah dipublish */
-       public function publishedAssignments(): HasMany
-       {
-           return $this->readingAssignments()->where('is_published', true);
-       }
+    /** Shortcut: tugas yang sudah dipublish */
+    public function publishedAssignments(): HasMany
+    {
+        return $this->readingAssignments()->where('is_published', true);
+    }
 
-       public function readingSessions(): HasManyThrough
-       {
-           return $this->hasManyThrough(
-               ReadingSession::class,
-               ReadingAssignment::class,
-               'classroom_id',   // FK di reading_assignments
-               'assignment_id',  // FK di reading_sessions
-           );
-       }
+    public function readingSessions(): HasManyThrough
+    {
+        return $this->hasManyThrough(
+            ReadingSession::class,
+            ReadingAssignment::class,
+            'classroom_id',   // FK di reading_assignments
+            'assignment_id',  // FK di reading_sessions
+        );
+    }
 
-       public function scopeActive($query)
-       {
-           return $query->where('is_active', true);
-       }
-
+    public function scopeActive($query)
+    {
+        return $query->where('is_active', true);
+    }
 }

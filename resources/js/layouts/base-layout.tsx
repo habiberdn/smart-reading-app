@@ -11,13 +11,17 @@ type Props = {
 
 export default function BaseLayout({ breadcrumbs = [], children }: Props) {
     const { auth } = usePage().props;
-    
+
     if (auth.user?.role === 'dosen') {
-        return <DosenLayout breadcrumbs={breadcrumbs}>{children}</DosenLayout>
+        return <DosenLayout breadcrumbs={breadcrumbs}>{children}</DosenLayout>;
     } else if (auth.user?.role === 'mahasiswa') {
-        return <MahasiswaLayout breadcrumbs={breadcrumbs}>{children}</MahasiswaLayout>;
+        return (
+            <MahasiswaLayout breadcrumbs={breadcrumbs}>
+                {children}
+            </MahasiswaLayout>
+        );
     }
-    
+
     return (
         <AppSidebarLayout breadcrumbs={breadcrumbs}>
             {children}

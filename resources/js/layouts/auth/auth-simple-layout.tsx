@@ -16,7 +16,6 @@ export default function AuthSimpleLayout({
                             href={dashboard()}
                             className="flex flex-col items-center gap-2 font-medium"
                         >
-                           
                             <span className="sr-only">{title}</span>
                         </Link>
 

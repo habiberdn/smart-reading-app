@@ -10,6 +10,8 @@ class ReadingProgress extends Model
 {
     use HasFactory;
 
+    protected $table = 'reading_progresses';
+
        protected $fillable = [
            'assignment_id',
            'mahasiswa_id',

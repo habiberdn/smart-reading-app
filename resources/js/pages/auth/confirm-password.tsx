@@ -14,7 +14,12 @@ import { store } from '@/routes/password/confirm';
 export default function ConfirmPassword() {
     return (
         <>
-            <Head title="Confirm password" />
+            <Head title="Confirm password">
+                <meta
+                    name="description"
+                    content="Konfirmasi password untuk melanjutkan ke area aman Smart Reading App."
+                />
+            </Head>
 
             <PasskeyVerify
                 routes={{

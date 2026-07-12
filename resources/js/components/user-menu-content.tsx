@@ -20,7 +20,7 @@ export function UserMenuContent({ user }: Props) {
 
     const handleLogout = () => {
         cleanup();
-        router.post('/dosen/logout', undefined, {
+        router.post('/logout', undefined, {
             replace: true,
         });
     };
@@ -29,7 +29,7 @@ export function UserMenuContent({ user }: Props) {
         <>
             <DropdownMenuLabel className="p-0 font-normal">
                 <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
-                    <UserInfo user={user} showEmail={true} />
+                    <UserInfo user={user} showUsername={true} />
                 </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
@@ -50,7 +50,7 @@ export function UserMenuContent({ user }: Props) {
             <DropdownMenuItem asChild>
                 <button
                     onClick={handleLogout}
-                    className="flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground"
+                    className="flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm transition-colors outline-none hover:bg-accent hover:text-accent-foreground"
                     data-test="logout-button"
                 >
                     <LogOut className="mr-2 h-4 w-4" />

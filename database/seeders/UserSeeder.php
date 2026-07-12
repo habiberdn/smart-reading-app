@@ -17,10 +17,9 @@ class UserSeeder extends Seeder
         // 1. BUAT DATA ADMIN (Untuk Testing Login Utama)
         User::create([
             'name' => 'Administrator Utama',
-            'email' => 'admin@mail.com',
+            'username' => 'UPI_ADMIN',
             'password' => Hash::make('password'),
             'role' => 'admin',
-            'email_verified_at' => now(),
             'remember_token' => Str::random(10),
         ]);
 
@@ -28,13 +27,13 @@ class UserSeeder extends Seeder
         $dataDosen = [
             [
                 'name' => 'Prof. Dr. Sarifuddin, M.Kom',
-                'email' => 'sarifuddin@upiyptk.ac.id',
+                'username' => 'UPI_SARIFUDDIN',
                 'nidn' => '1023048501',
                 'program_studi' => 'Sistem Informasi',
             ],
             [
                 'name' => 'Dr. Erika Amelia, S.Kom, M.T',
-                'email' => 'erika.amelia@upiyptk.ac.id',
+                'username' => 'UPI_ERIKA',
                 'nidn' => '1008128902',
                 'program_studi' => 'Teknik Informatika',
             ]
@@ -43,13 +42,12 @@ class UserSeeder extends Seeder
         foreach ($dataDosen as $dosen) {
             User::create([
                 'name' => $dosen['name'],
-                'email' => $dosen['email'],
+                'username' => $dosen['username'],
                 'password' => Hash::make('password'),
                 'role' => 'dosen',
                 'nidn' => $dosen['nidn'],
-                'nim' => null, // Dipastikan null untuk dosen
+                'nim' => null,
                 'program_studi' => $dosen['program_studi'],
-                'email_verified_at' => now(),
             ]);
         }
 
@@ -57,19 +55,19 @@ class UserSeeder extends Seeder
         $dataMahasiswa = [
             [
                 'name' => 'Rahmat Hidayat',
-                'email' => 'rahmat.h@mail.com',
+                'username' => 'UPI_2210115261001',
                 'nim' => '2210115261001',
                 'program_studi' => 'Teknik Informatika',
             ],
             [
                 'name' => 'Siti Khadijah',
-                'email' => 'siti.k@mail.com',
+                'username' => 'UPI_2210115263025',
                 'nim' => '2210115263025',
                 'program_studi' => 'Sistem Informasi',
             ],
             [
                 'name' => 'Andi Wijaya',
-                'email' => 'andi.w@mail.com',
+                'username' => 'UPI_2110115261099',
                 'nim' => '2110115261099',
                 'program_studi' => 'Sistem Komputer',
             ]
@@ -78,13 +76,12 @@ class UserSeeder extends Seeder
         foreach ($dataMahasiswa as $mhs) {
             User::create([
                 'name' => $mhs['name'],
-                'email' => $mhs['email'],
+                'username' => $mhs['username'],
                 'password' => Hash::make('password'),
                 'role' => 'mahasiswa',
                 'nim' => $mhs['nim'],
-                'nidn' => null, // Dipastikan null untuk mahasiswa
+                'nidn' => null,
                 'program_studi' => $mhs['program_studi'],
-                'email_verified_at' => now(),
             ]);
         }
     }

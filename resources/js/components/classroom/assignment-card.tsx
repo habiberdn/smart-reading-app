@@ -1,11 +1,18 @@
+import { Link } from '@inertiajs/react';
 import { MoreHorizontal, ChevronRight } from 'lucide-react';
 
 export default function AssignmentCard({
     title,
     dueDate,
+    completionRate = 0,
+    averageProgress = 0,
+    classroomKode,
 }: {
     title: string;
     dueDate: string;
+    completionRate?: number;
+    averageProgress?: number;
+    classroomKode?: string;
 }) {
     return (
         <div className="flex flex-col gap-4 rounded-xl border bg-card p-5 shadow-sm">
@@ -20,19 +27,25 @@ export default function AssignmentCard({
                 <div>
                     <div className="mb-1 flex justify-between text-muted-foreground">
                         <span>Tingkat Pengumpulan</span>
-                        <span>NaN%</span>
+                        <span>{completionRate}%</span>
                     </div>
                     <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
-                        <div className="h-full w-[0%] bg-primary" />
+                        <div
+                            className="h-full bg-primary transition-all duration-500"
+                            style={{ width: `${completionRate}%` }}
+                        />
                     </div>
                 </div>
                 <div>
                     <div className="mb-1 flex justify-between text-muted-foreground">
                         <span>Rata-rata Progress</span>
-                        <span>%</span>
+                        <span>{averageProgress}%</span>
                     </div>
                     <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
-                        <div className="h-full w-[0%] bg-primary" />
+                        <div
+                            className="h-full bg-primary transition-all duration-500"
+                            style={{ width: `${averageProgress}%` }}
+                        />
                     </div>
                 </div>
             </div>
@@ -41,9 +54,18 @@ export default function AssignmentCard({
                 <span className="font-medium text-muted-foreground">
                     Tenggat: {dueDate}
                 </span>
-                <button className="flex items-center gap-0.5 font-medium text-primary hover:text-primary/80">
-                    Lihat Detail <ChevronRight className="h-3.5 w-3.5" />
-                </button>
+                {classroomKode ? (
+                    <Link
+                        href={`/dosen/classrooms/${classroomKode}`}
+                        className="flex items-center gap-0.5 font-medium text-primary hover:text-primary/80"
+                    >
+                        Lihat Detail <ChevronRight className="h-3.5 w-3.5" />
+                    </Link>
+                ) : (
+                    <button className="flex items-center gap-0.5 font-medium text-primary hover:text-primary/80">
+                        Lihat Detail <ChevronRight className="h-3.5 w-3.5" />
+                    </button>
+                )}
             </div>
         </div>
     );
