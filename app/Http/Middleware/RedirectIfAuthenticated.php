@@ -18,6 +18,7 @@ class RedirectIfAuthenticated
                 $user = Auth::user();
 
                 $redirectTo = match ($user->role) {
+                    'superadmin' => '/superadmin/dashboard',
                     'admin' => '/admin/dashboard',
                     'dosen' => '/dosen/dashboard',
                     'mahasiswa' => '/mahasiswa/dashboard',

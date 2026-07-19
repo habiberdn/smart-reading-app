@@ -56,6 +56,10 @@ class ClassroomController extends Controller
             ->with(['dosen'])
             ->firstOrFail();
 
+        if (Auth::user()->role === 'dosen' && $classroom->dosen_id !== Auth::id()) {
+            abort(403, 'Anda tidak diizinkan mengakses kelas ini.');
+        }
+
         if (Auth::user()->role === 'mahasiswa') {
             // Check if student joined this classroom
             $joined = $classroom->mahasiswa()->where('mahasiswa_id', Auth::id())->exists();

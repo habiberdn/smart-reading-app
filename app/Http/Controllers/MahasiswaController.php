@@ -124,6 +124,11 @@ class MahasiswaController extends Controller
 
         $assignment = ReadingAssignment::findOrFail($assignment_id);
 
+        $joined = $assignment->classroom->mahasiswa()->where('mahasiswa_id', Auth::id())->exists();
+        if (!$joined && !$assignment->is_published) {
+            abort(403, 'Anda tidak memiliki akses ke assignment ini.');
+        }
+
         \Illuminate\Support\Facades\DB::transaction(function () use ($request, $assignment) {
             $progress = ReadingProgress::firstOrCreate([
                 'assignment_id' => $assignment->id,
@@ -133,6 +138,7 @@ class MahasiswaController extends Controller
                 'halaman_sekarang'   => 1,
                 'persentase'         => 0.00,
                 'total_durasi_detik' => 0,
+                'first_opened_at'    => now(),
             ]);
 
             $progress->total_durasi_detik += $request->seconds;
@@ -188,9 +194,22 @@ class MahasiswaController extends Controller
             'current_page' => 'nullable|integer',
         ]);
 
-        $progress = ReadingProgress::where('assignment_id', $assignment_id)
-            ->where('mahasiswa_id', Auth::id())
-            ->firstOrFail();
+        $assignment = ReadingAssignment::findOrFail($assignment_id);
+        $joined = $assignment->classroom->mahasiswa()->where('mahasiswa_id', Auth::id())->exists();
+        if (!$joined && !$assignment->is_published) {
+            abort(403, 'Anda tidak memiliki akses ke assignment ini.');
+        }
+
+        $progress = ReadingProgress::firstOrCreate([
+            'assignment_id' => $assignment_id,
+            'mahasiswa_id'  => Auth::id(),
+        ], [
+            'status'             => 'in_progress',
+            'halaman_sekarang'   => $request->current_page ?? 1,
+            'persentase'         => 0.00,
+            'total_durasi_detik' => 0,
+            'first_opened_at'    => now(),
+        ]);
 
         \Illuminate\Support\Facades\DB::transaction(function () use ($request, $progress, $assignment_id) {
             $progress->status = 'completed';

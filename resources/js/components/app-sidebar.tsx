@@ -4,6 +4,7 @@ import {
     LayoutGrid,
     BookOpenCheck,
     BookOpen,
+    ShieldAlert,
 } from 'lucide-react';
 import { NavMain } from '@/components/nav-main';
 import {
@@ -21,6 +22,21 @@ import type { NavItem } from '@/types';
 import type { Role } from '@/types/auth';
 
 function useNavItems(role: Role | null | undefined): NavItem[] {
+    if (role === 'superadmin') {
+        return [
+            {
+                title: 'Dashboard',
+                href: '/superadmin/dashboard',
+                icon: LayoutGrid,
+            },
+            {
+                title: 'Kelola Admin',
+                href: '/superadmin/admin',
+                icon: ShieldAlert,
+            },
+        ];
+    }
+
     if (role === 'admin') {
         return [
             {
@@ -91,11 +107,13 @@ export function AppSidebar() {
     const navItems = useNavItems(role);
 
     const dashboardHref =
-        role === 'admin'
-            ? '/admin/dashboard'
-            : role === 'dosen'
-              ? dosenDashboard()
-              : mahasiswaDashboard();
+        role === 'superadmin'
+            ? '/superadmin/dashboard'
+            : role === 'admin'
+              ? '/admin/dashboard'
+              : role === 'dosen'
+                ? dosenDashboard()
+                : mahasiswaDashboard();
 
     return (
         <Sidebar collapsible="icon" variant="inset">

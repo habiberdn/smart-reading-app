@@ -16,8 +16,11 @@ class User extends Authenticatable
     protected $fillable = [
         'name',
         'username',
+        'email',
+        'google_id',
         'password',
         'role',
+        'kampus',
         'nim',
         'nidn',
         'program_studi',
@@ -34,6 +37,11 @@ class User extends Authenticatable
         return [
             'password'          => 'hashed',
         ];
+    }
+
+    public function isSuperadmin(): bool
+    {
+        return $this->role === 'superadmin';
     }
 
     public function isMahasiswa(): bool

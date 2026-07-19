@@ -1,4 +1,4 @@
-import { Head, useForm } from '@inertiajs/react';
+import { Head, useForm, usePage, router } from '@inertiajs/react';
 import {
     Plus,
     Search,
@@ -6,8 +6,11 @@ import {
     Trash2,
     GraduationCap,
     Loader2,
+    Link2,
+    Copy,
+    Check,
 } from 'lucide-react';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import {
@@ -28,11 +31,13 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
+import BaseLayout from '@/layouts/base-layout';
 
 interface Lecturer {
     id: number;
     name: string;
     username: string;
+    kampus: string
     nidn: string | null;
     program_studi: string | null;
     classrooms_as_dosen_count?: number;
@@ -44,13 +49,50 @@ interface Props {
 }
 
 export default function KelolaDosen({ dosenList = [] }: Props) {
+    const { flash } = usePage<{ flash: { invitationUrl?: string } }>().props as any;
     const [searchQuery, setSearchQuery] = useState('');
-    const [isCreateOpen, setIsCreateOpen] = useState(false);
-    const [isEditOpen, setIsEditOpen] = useState(false);
-    const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+    const [activeDialog, setActiveDialog] = useState<
+        'create' | 'edit' | 'delete' | 'invitation' | null
+    >(null);
     const [selectedLecturer, setSelectedLecturer] = useState<Lecturer | null>(
         null,
     );
+    const [invitationUrl, setInvitationUrl] = useState('');
+    const [copied, setCopied] = useState(false);
+    const [generating, setGenerating] = useState(false);
+
+    // Watch for flash data containing invitation URL
+    useEffect(() => {
+        if (flash?.invitationUrl) {
+            setInvitationUrl(flash.invitationUrl);
+            setActiveDialog('invitation');
+            setGenerating(false);
+        }
+    }, [flash?.invitationUrl]);
+
+    // Handle Generate Invitation Link
+    const handleGenerateLink = () => {
+        setGenerating(true);
+        router.post('/admin/invitation/generate', {}, {
+            preserveScroll: true,
+            onError: () => {
+                setGenerating(false);
+                toast.error('Gagal men-generate link undangan.');
+            },
+        });
+    };
+
+    // Handle Copy Link to Clipboard
+    const handleCopyLink = async () => {
+        try {
+            await navigator.clipboard.writeText(invitationUrl);
+            setCopied(true);
+            toast.success('Link berhasil disalin!');
+            setTimeout(() => setCopied(false), 2000);
+        } catch {
+            toast.error('Gagal menyalin link.');
+        }
+    };
 
     // Form for Creating Lecturer
     const createForm = useForm({
@@ -75,7 +117,7 @@ export default function KelolaDosen({ dosenList = [] }: Props) {
         e.preventDefault();
         createForm.post('/admin/dosen', {
             onSuccess: () => {
-                setIsCreateOpen(false);
+                setActiveDialog(null);
                 createForm.reset();
                 toast.success('Dosen berhasil ditambahkan!');
             },
@@ -96,7 +138,7 @@ export default function KelolaDosen({ dosenList = [] }: Props) {
             program_studi: lecturer.program_studi ?? '',
         });
         editForm.clearErrors();
-        setIsEditOpen(true);
+        setActiveDialog('edit');
     };
 
     // Handle Edit Submit
@@ -109,7 +151,7 @@ export default function KelolaDosen({ dosenList = [] }: Props) {
 
         editForm.put(`/admin/dosen/${selectedLecturer.id}`, {
             onSuccess: () => {
-                setIsEditOpen(false);
+                setActiveDialog(null);
                 editForm.reset();
                 toast.success('Data dosen berhasil diperbarui!');
             },
@@ -124,7 +166,7 @@ export default function KelolaDosen({ dosenList = [] }: Props) {
     // Open Delete Dialog
     const openDeleteDialog = (lecturer: Lecturer) => {
         setSelectedLecturer(lecturer);
-        setIsDeleteOpen(true);
+        setActiveDialog('delete');
     };
 
     // Handle Delete Submit
@@ -135,7 +177,7 @@ export default function KelolaDosen({ dosenList = [] }: Props) {
 
         createForm.delete(`/admin/dosen/${selectedLecturer.id}`, {
             onSuccess: () => {
-                setIsDeleteOpen(false);
+                setActiveDialog(null);
                 toast.success('Dosen berhasil dihapus!');
             },
             onError: () => {
@@ -181,16 +223,31 @@ export default function KelolaDosen({ dosenList = [] }: Props) {
                             Kelola Data Dosen
                         </h1>
                     </div>
-                    <Button
-                        className="gap-2 font-medium shadow-sm"
-                        onClick={() => {
-                            createForm.reset();
-                            createForm.clearErrors();
-                            setIsCreateOpen(true);
-                        }}
-                    >
-                        <Plus className="h-4 w-4" /> Dosen Baru
-                    </Button>
+                    <div className="flex gap-2">
+                        <Button
+                            variant="outline"
+                            className="gap-2 font-medium shadow-sm"
+                            onClick={handleGenerateLink}
+                            disabled={generating}
+                        >
+                            {generating ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                                <Link2 className="h-4 w-4" />
+                            )}
+                            Generate Link Undangan
+                        </Button>
+                        <Button
+                            className="gap-2 font-medium shadow-sm"
+                            onClick={() => {
+                                createForm.reset();
+                                createForm.clearErrors();
+                                setActiveDialog('create');
+                            }}
+                        >
+                            <Plus className="h-4 w-4" /> Dosen Baru
+                        </Button>
+                    </div>
                 </div>
 
                 {/* Search Bar & Stats */}
@@ -222,14 +279,15 @@ export default function KelolaDosen({ dosenList = [] }: Props) {
                     <Table>
                         <TableHeader>
                             <TableRow>
-                                <TableHead>Nama</TableHead>
-                                <TableHead>Username</TableHead>
-                                <TableHead>NIDN</TableHead>
-                                <TableHead>Program Studi</TableHead>
-                                <TableHead className="text-center">
+                                <TableHead className='text-center'>Universitas</TableHead>
+                                <TableHead className='text-center'>Nama</TableHead>
+                                <TableHead className='text-center'>Username</TableHead>
+                                <TableHead className='text-center'>NIDN</TableHead>
+                                <TableHead className='text-center'>Program Studi</TableHead>
+                                <TableHead className='text-center'>
                                     Jumlah Kelas
                                 </TableHead>
-                                <TableHead className="text-right">
+                                <TableHead className='text-center'>
                                     Aksi
                                 </TableHead>
                             </TableRow>
@@ -241,21 +299,25 @@ export default function KelolaDosen({ dosenList = [] }: Props) {
                                         key={lecturer.id}
                                         className="hover:bg-muted/30"
                                     >
+                                        <TableCell className="text-center font-mono text-xs">
+                                            {lecturer.kampus ?? '-'}
+                                        </TableCell>
+
                                         <TableCell className="font-medium">
-                                            <div className="flex items-center gap-2">
+                                            <div className="flex items-center gap-2 justify-center">
                                                 <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary">
                                                     <GraduationCap className="h-4 w-4" />
                                                 </div>
                                                 <span>{lecturer.name}</span>
                                             </div>
                                         </TableCell>
-                                        <TableCell className="font-mono text-xs">
+                                        <TableCell className="font-mono text-xs text-center">
                                             {lecturer.username}
                                         </TableCell>
-                                        <TableCell>
+                                        <TableCell className="text-center">
                                             {lecturer.nidn || '-'}
                                         </TableCell>
-                                        <TableCell>
+                                        <TableCell className="text-center">
                                             {lecturer.program_studi || '-'}
                                         </TableCell>
                                         <TableCell className="text-center">
@@ -266,7 +328,7 @@ export default function KelolaDosen({ dosenList = [] }: Props) {
                                             </span>
                                         </TableCell>
                                         <TableCell className="text-right">
-                                            <div className="flex justify-end gap-2">
+                                            <div className="flex justify-center gap-2">
                                                 <Button
                                                     variant="ghost"
                                                     size="icon"
@@ -309,8 +371,13 @@ export default function KelolaDosen({ dosenList = [] }: Props) {
             </div>
 
             {/* Modal Create Dosen */}
-            <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-                <DialogContent className="sm:max-w-[425px]">
+            <Dialog
+                open={activeDialog === 'create'}
+                onOpenChange={(isOpen) =>
+                    setActiveDialog(isOpen ? 'create' : null)
+                }
+            >
+                <DialogContent className="sm:max-w-106.25">
                     <form onSubmit={handleCreateSubmit}>
                         <DialogHeader>
                             <DialogTitle>Tambah Dosen Baru</DialogTitle>
@@ -434,7 +501,7 @@ export default function KelolaDosen({ dosenList = [] }: Props) {
                             <Button
                                 type="button"
                                 variant="outline"
-                                onClick={() => setIsCreateOpen(false)}
+                                onClick={() => setActiveDialog(null)}
                                 disabled={createForm.processing}
                             >
                                 Batal
@@ -454,7 +521,12 @@ export default function KelolaDosen({ dosenList = [] }: Props) {
             </Dialog>
 
             {/* Modal Edit Dosen */}
-            <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+            <Dialog
+                open={activeDialog === 'edit'}
+                onOpenChange={(isOpen) =>
+                    setActiveDialog(isOpen ? 'edit' : null)
+                }
+            >
                 <DialogContent className="sm:max-w-[425px]">
                     <form onSubmit={handleEditSubmit}>
                         <DialogHeader>
@@ -568,7 +640,7 @@ export default function KelolaDosen({ dosenList = [] }: Props) {
                             <Button
                                 type="button"
                                 variant="outline"
-                                onClick={() => setIsEditOpen(false)}
+                                onClick={() => setActiveDialog(null)}
                                 disabled={editForm.processing}
                             >
                                 Batal
@@ -588,7 +660,12 @@ export default function KelolaDosen({ dosenList = [] }: Props) {
             </Dialog>
 
             {/* Modal Delete Confirmation */}
-            <Dialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
+            <Dialog
+                open={activeDialog === 'delete'}
+                onOpenChange={(isOpen) =>
+                    setActiveDialog(isOpen ? 'delete' : null)
+                }
+            >
                 <DialogContent className="sm:max-w-[400px]">
                     <DialogHeader>
                         <DialogTitle>Konfirmasi Hapus</DialogTitle>
@@ -605,7 +682,7 @@ export default function KelolaDosen({ dosenList = [] }: Props) {
                     <DialogFooter className="mt-4">
                         <Button
                             variant="outline"
-                            onClick={() => setIsDeleteOpen(false)}
+                            onClick={() => setActiveDialog(null)}
                         >
                             Batal
                         </Button>
@@ -618,15 +695,93 @@ export default function KelolaDosen({ dosenList = [] }: Props) {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            {/* Modal Invitation Link */}
+            <Dialog
+                open={activeDialog === 'invitation'}
+                onOpenChange={(isOpen) => {
+                    setActiveDialog(isOpen ? 'invitation' : null);
+                    if (!isOpen) {
+                        setCopied(false);
+                    }
+                }}
+            >
+                <DialogContent className="sm:max-w-[500px]">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <Link2 className="h-5 w-5 text-primary" />
+                            Link Undangan Dosen
+                        </DialogTitle>
+                        <DialogDescription>
+                            Bagikan link di bawah ini kepada calon dosen. Link
+                            berlaku selama <span className="font-semibold text-foreground">24 jam</span> dan
+                            hanya bisa digunakan untuk mendaftar sebagai dosen
+                            di kampus Anda.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="py-4">
+                        <div className="flex items-center gap-2">
+                            <Input
+                                id="invitation-url"
+                                readOnly
+                                value={invitationUrl}
+                                className="flex-1 font-mono text-xs"
+                                onClick={(e) => (e.target as HTMLInputElement).select()}
+                            />
+                            <Button
+                                type="button"
+                                variant={copied ? 'default' : 'outline'}
+                                size="icon"
+                                className="shrink-0"
+                                onClick={handleCopyLink}
+                            >
+                                {copied ? (
+                                    <Check className="h-4 w-4" />
+                                ) : (
+                                    <Copy className="h-4 w-4" />
+                                )}
+                            </Button>
+                        </div>
+                        <p className="mt-3 text-xs text-muted-foreground">
+                            Dosen akan diminta untuk login menggunakan akun Google
+                            saat mengakses link ini.
+                        </p>
+                    </div>
+                    <DialogFooter>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setActiveDialog(null)}
+                        >
+                            Tutup
+                        </Button>
+                        <Button
+                            type="button"
+                            onClick={handleCopyLink}
+                        >
+                            {copied ? (
+                                <Check className="mr-2 h-4 w-4" />
+                            ) : (
+                                <Copy className="mr-2 h-4 w-4" />
+                            )}
+                            {copied ? 'Tersalin!' : 'Salin Link'}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </>
     );
 }
 
-KelolaDosen.layout = {
-    breadcrumbs: [
-        {
-            title: 'Kelola Dosen',
-            href: '/admin/dosen',
-        },
-    ],
-};
+KelolaDosen.layout = (page: React.ReactNode) => (
+    <BaseLayout
+        breadcrumbs={[
+            {
+                title: 'Kelola Dosen',
+                href: '/admin/dosen',
+            },
+        ]}
+    >
+        {page}
+    </BaseLayout>
+);

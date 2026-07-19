@@ -50,7 +50,7 @@ class ReadingController extends Controller
         $document = [
             'id'              => $assignment->id,
             'title'           => $assignment->judul,
-            'fileName'        => basename($assignment->file_path),
+            'fileName'        => $assignment->file_path ? basename($assignment->file_path) : 'Tidak ada lampiran',
             'fileUrl'         => $assignment->file_path ? asset('storage/' . $assignment->file_path) : null,
             'difficultyScore' => $assignment->difficulty_score ?? 50,
             'totalHalaman'    => $assignment->total_halaman ?? 1,

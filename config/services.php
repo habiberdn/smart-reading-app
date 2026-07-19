@@ -42,4 +42,10 @@ return [
         'capacity_weight'   => env('REC_CAPACITY_WEIGHT', 0.15),
     ],
 
+    'google' => [
+        'client_id' => env('GOOGLE_CLIENT_ID'),
+        'client_secret' => env('GOOGLE_CLIENT_SECRET'),
+        'redirect' => env('GOOGLE_REDIRECT_URI', '/auth/google/callback'),
+    ],
+
 ];

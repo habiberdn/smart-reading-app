@@ -16,7 +16,7 @@ return new class extends Migration
             $table->string('name')->nullable();
             $table->string('username')->unique();
             $table->string('password');
-            $table->enum('role', ['mahasiswa', 'dosen', 'admin'])->default('mahasiswa');
+            $table->enum('role', ['superadmin','mahasiswa', 'dosen', 'admin'])->default('mahasiswa');
 
             // Shared optional profile fields
             $table->string('nim')->nullable()->comment('Nomor Induk Mahasiswa - only for mahasiswa');

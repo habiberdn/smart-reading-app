@@ -23,6 +23,9 @@ class ReadingAssignmentController extends Controller
         ]);
 
         $classroom = Classroom::where('kode_kelas', $kode)->firstOrFail();
+        if ($classroom->dosen_id !== Auth::id()) {
+            abort(403, 'Anda tidak memiliki akses untuk menambahkan tugas ke kelas ini.');
+        }
 
         // 1. Store the PDF file
         $path = $request->file('pdfFile')->store('assignments', 'public');

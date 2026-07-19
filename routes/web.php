@@ -1,13 +1,19 @@
 <?php
 
+use App\Http\Controllers\Admin\AdminDashboardController;
+use App\Http\Controllers\Admin\AdminDosenController;
+use App\Http\Controllers\Admin\InvitationController;
 use App\Http\Controllers\AuthenticatedSessionController;
-use Illuminate\Support\Facades\Route;
-use Illuminate\Support\Facades\Auth;
 use App\Http\Controllers\ClassroomController;
-use App\Http\Controllers\ReadingAssignmentController;
-use App\Http\Controllers\MahasiswaController;
-use App\Http\Controllers\ReadingController;
 use App\Http\Controllers\DosenController;
+use App\Http\Controllers\GoogleAuthController;
+use App\Http\Controllers\MahasiswaController;
+use App\Http\Controllers\ReadingAssignmentController;
+use App\Http\Controllers\ReadingController;
+use App\Http\Controllers\Superadmin\SuperadminAdminController;
+use App\Http\Controllers\Superadmin\SuperadminDashboardController;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
 Route::middleware(['guest'])->group(function () {
@@ -49,23 +55,48 @@ Route::middleware(['auth', 'role:mahasiswa'])->prefix('mahasiswa')->name('mahasi
 Route::get('/', function () {
     if (Auth::check()) {
         $user = Auth::user();
+
         return match ($user->role) {
+            'superadmin' => redirect()->route('superadmin.dashboard'),
             'admin' => redirect()->route('admin.dashboard'),
             'dosen' => redirect()->route('dosen.dashboard'),
             'mahasiswa' => redirect()->route('mahasiswa.dashboard'),
             default => redirect()->route('login'),
         };
     }
+
     return redirect()->route('login');
 });
 
 // ADMIN
 Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->group(function () {
-    Route::get('/dashboard', [\App\Http\Controllers\Admin\AdminDashboardController::class, 'index'])->name('dashboard');
-    Route::get('/dosen', [\App\Http\Controllers\Admin\AdminDosenController::class, 'index'])->name('dosen.index');
-    Route::post('/dosen', [\App\Http\Controllers\Admin\AdminDosenController::class, 'store'])->name('dosen.store');
-    Route::put('/dosen/{user}', [\App\Http\Controllers\Admin\AdminDosenController::class, 'update'])->name('dosen.update');
-    Route::delete('/dosen/{user}', [\App\Http\Controllers\Admin\AdminDosenController::class, 'destroy'])->name('dosen.destroy');
+    Route::get('/dashboard', [AdminDashboardController::class, 'index'])->name('dashboard');
+    Route::get('/dosen', [AdminDosenController::class, 'index'])->name('dosen.index');
+    Route::post('/dosen', [AdminDosenController::class, 'store'])->name('dosen.store');
+    Route::put('/dosen/{user}', [AdminDosenController::class, 'update'])->name('dosen.update');
+    Route::delete('/dosen/{user}', [AdminDosenController::class, 'destroy'])->name('dosen.destroy');
+    Route::post('/invitation/generate', [InvitationController::class, 'generateLink'])->name('invitation.generate');
 });
 
-require __DIR__ . '/settings.php';
+// SUPERADMIN
+Route::middleware(['auth', 'role:superadmin'])->prefix('superadmin')->name('superadmin.')->group(function () {
+    Route::get('/dashboard', [SuperadminDashboardController::class, 'index'])->name('dashboard');
+    Route::get('/admin', [SuperadminAdminController::class, 'index'])->name('admin.index');
+    Route::post('/admin', [SuperadminAdminController::class, 'store'])->name('admin.store');
+    Route::put('/admin/{user}', [SuperadminAdminController::class, 'update'])->name('admin.update');
+    Route::delete('/admin/{user}', [SuperadminAdminController::class, 'destroy'])->name('admin.destroy');
+});
+
+// INVITATION & GOOGLE OAUTH (Public routes)
+Route::get('/invitation/accept', [GoogleAuthController::class, 'accept'])
+    ->name('invitation.accept')
+    ->middleware('signed');
+
+Route::get('/auth/google/redirect', [GoogleAuthController::class, 'redirect'])
+    ->name('auth.google.redirect')
+    ->middleware('guest');
+
+Route::get('/api/auth/callback/google', [GoogleAuthController::class, 'callback'])
+    ->name('auth.google.callback');
+
+require __DIR__.'/settings.php';

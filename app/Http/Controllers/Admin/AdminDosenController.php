@@ -13,6 +13,7 @@ class AdminDosenController extends Controller
     public function index(): Response
     {
         $dosenList = User::where('role', 'dosen')
+            ->where('kampus', auth()->user()->kampus)
             ->withCount('classroomsAsDosen')
             ->latest()
             ->get();
@@ -37,6 +38,7 @@ class AdminDosenController extends Controller
             'username' => $validated['username'],
             'password' => bcrypt($validated['password']),
             'role' => 'dosen',
+            'kampus' => auth()->user()->kampus,
             'nidn' => $validated['nidn'] ?? null,
             'program_studi' => $validated['program_studi'] ?? null,
         ]);
@@ -46,15 +48,15 @@ class AdminDosenController extends Controller
 
     public function update(Request $request, User $user)
     {
-        if ($user->role !== 'dosen') {
+        if ($user->role !== 'dosen' || $user->kampus !== auth()->user()->kampus) {
             abort(403, 'Action unauthorized.');
         }
 
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'username' => 'required|string|max:255|unique:users,username,' . $user->id,
+            'username' => 'required|string|max:255|unique:users,username,'.$user->id,
             'password' => 'nullable|string|min:8',
-            'nidn' => 'nullable|string|max:255|unique:users,nidn,' . $user->id,
+            'nidn' => 'nullable|string|max:255|unique:users,nidn,'.$user->id,
             'program_studi' => 'nullable|string|max:255',
         ]);
 
@@ -65,7 +67,7 @@ class AdminDosenController extends Controller
             'program_studi' => $validated['program_studi'] ?? null,
         ];
 
-        if (!empty($validated['password'])) {
+        if (! empty($validated['password'])) {
             $updateData['password'] = bcrypt($validated['password']);
         }
 
@@ -76,7 +78,7 @@ class AdminDosenController extends Controller
 
     public function destroy(User $user)
     {
-        if ($user->role !== 'dosen') {
+        if ($user->role !== 'dosen' || $user->kampus !== auth()->user()->kampus) {
             abort(403, 'Action unauthorized.');
         }
 

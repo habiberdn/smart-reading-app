@@ -67,13 +67,13 @@ return [
     | Home Path
     |--------------------------------------------------------------------------
     |
-    | Here you may configure the path where users will get redirected during
-    | authentication or password reset when the operations are successful
-    | and the user is authenticated. You are free to change this value.
+    | Here you may configure the path where users will redirect to after
+    | login or registration. This is used as the default path for many
+    | of Fortify's responses. We will route to root to let the web route handle role-based redirection.
     |
     */
 
-    'home' => '/dashboard',
+    'home' => '/',
 
     'redirects' => [
         'logout' => '/login',

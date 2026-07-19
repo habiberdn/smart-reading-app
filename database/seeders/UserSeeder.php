@@ -17,7 +17,16 @@ class UserSeeder extends Seeder
         // 1. BUAT DATA ADMIN (Untuk Testing Login Utama)
         User::create([
             'name' => 'Administrator Utama',
+            'username' => 'UPI_SUPERADMIN',
+            'password' => Hash::make('password'),
+            'role' => 'superadmin',
+            'remember_token' => Str::random(10),
+        ]);
+
+        User::create([
+            'name' => 'Administrator',
             'username' => 'UPI_ADMIN',
+            'kampus' => 'UPI',
             'password' => Hash::make('password'),
             'role' => 'admin',
             'remember_token' => Str::random(10),
@@ -28,21 +37,26 @@ class UserSeeder extends Seeder
             [
                 'name' => 'Prof. Dr. Sarifuddin, M.Kom',
                 'username' => 'UPI_SARIFUDDIN',
+                'kampus' => 'UPI',
+
                 'nidn' => '1023048501',
                 'program_studi' => 'Sistem Informasi',
             ],
             [
                 'name' => 'Dr. Erika Amelia, S.Kom, M.T',
                 'username' => 'UPI_ERIKA',
+                'kampus' => 'UPI',
+
                 'nidn' => '1008128902',
                 'program_studi' => 'Teknik Informatika',
-            ]
+            ],
         ];
 
         foreach ($dataDosen as $dosen) {
             User::create([
                 'name' => $dosen['name'],
                 'username' => $dosen['username'],
+                'kampus' => $dosen['kampus'],
                 'password' => Hash::make('password'),
                 'role' => 'dosen',
                 'nidn' => $dosen['nidn'],
@@ -70,7 +84,7 @@ class UserSeeder extends Seeder
                 'username' => 'UPI_2110115261099',
                 'nim' => '2110115261099',
                 'program_studi' => 'Sistem Komputer',
-            ]
+            ],
         ];
 
         foreach ($dataMahasiswa as $mhs) {

@@ -1,5 +1,5 @@
 import { Link } from '@inertiajs/react';
-import { dashboard } from '@/routes';
+import { login } from '@/routes';
 import type { AuthLayoutProps } from '@/types';
 
 export default function AuthSimpleLayout({
@@ -13,7 +13,7 @@ export default function AuthSimpleLayout({
                 <div className="flex flex-col gap-8">
                     <div className="flex flex-col items-center gap-4">
                         <Link
-                            href={dashboard()}
+                            href={login()}
                             className="flex flex-col items-center gap-2 font-medium"
                         >
                             <span className="sr-only">{title}</span>
