@@ -12,6 +12,7 @@ import {
     Copy,
     Check,
     Eye,
+    Pencil,
 } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
@@ -62,6 +63,7 @@ interface ClassroomType {
     semester: string | number;
     deskripsi: string | null;
     kode_kelas: string;
+    is_active?: boolean;
     dosen?: {
         name: string;
     };
@@ -81,6 +83,18 @@ export default function DetailKelas({ classroom, students = [] }: Props) {
     const [dueDate, setDueDate] = useState('');
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
+
+    // Edit & Delete classroom state
+    const [isEditOpen, setEditOpen] = useState(false);
+    const [isDeleteOpen, setDeleteOpen] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [editForm, setEditForm] = useState({
+        name: classroom?.name || '',
+        semester: String(classroom?.semester || ''),
+        kode_kelas: classroom?.kode_kelas || '',
+        deskripsi: classroom?.deskripsi || '',
+        is_active: classroom?.is_active !== false,
+    });
 
     // Helper to display difficulty nicely
     const getDifficultyLabel = (diff?: string) => {
@@ -154,6 +168,46 @@ export default function DetailKelas({ classroom, students = [] }: Props) {
         setSelectedFile(null);
     };
 
+    // Edit classroom handler
+    const handleEditClassroom = (e: React.FormEvent) => {
+        e.preventDefault();
+        setIsSubmitting(true);
+        router.put(
+            `/dosen/classrooms/${classroom.kode_kelas}`,
+            {
+                name: editForm.name,
+                semester: parseInt(editForm.semester, 10),
+                kode_kelas: editForm.kode_kelas,
+                deskripsi: editForm.deskripsi,
+                is_active: editForm.is_active,
+            },
+            {
+                onSuccess: () => {
+                    setIsSubmitting(false);
+                    setEditOpen(false);
+                },
+                onError: (err) => {
+                    setIsSubmitting(false);
+                    alert('Gagal mengubah kelas: ' + Object.values(err).join(', '));
+                },
+            },
+        );
+    };
+
+    // Delete classroom handler
+    const handleDeleteClassroom = () => {
+        setIsSubmitting(true);
+        router.delete(`/dosen/classrooms/${classroom.kode_kelas}`, {
+            onSuccess: () => {
+                setIsSubmitting(false);
+            },
+            onError: (err) => {
+                setIsSubmitting(false);
+                alert('Gagal menghapus kelas: ' + Object.values(err).join(', '));
+            },
+        });
+    };
+
     return (
         <>
             <Head title={`Detail Kelas - ${classroom?.name}`}>
@@ -181,6 +235,14 @@ export default function DetailKelas({ classroom, students = [] }: Props) {
                                 {classroom?.deskripsi || 'Tidak ada deskripsi.'}{' '}
                                 • Semester {classroom?.semester}
                             </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <Button variant="outline" size="sm" className="gap-1.5" onClick={() => { setEditForm({ name: classroom?.name || '', semester: String(classroom?.semester || ''), kode_kelas: classroom?.kode_kelas || '', deskripsi: classroom?.deskripsi || '', is_active: classroom?.is_active !== false }); setEditOpen(true); }}>
+                                <Pencil className="h-3.5 w-3.5" /> Edit Kelas
+                            </Button>
+                            <Button variant="outline" size="sm" className="gap-1.5 text-destructive hover:bg-destructive hover:text-destructive-foreground" onClick={() => setDeleteOpen(true)}>
+                                <Trash2 className="h-3.5 w-3.5" /> Hapus Kelas
+                            </Button>
                         </div>
                         <div className="flex w-fit items-center gap-2 rounded-lg border bg-background p-2.5 shadow-sm">
                             <Key className="h-4 w-4 text-amber-500" />
@@ -515,6 +577,64 @@ export default function DetailKelas({ classroom, students = [] }: Props) {
                             </Button>
                         </DialogFooter>
                     </form>
+                </DialogContent>
+            </Dialog>
+
+            {/* MODAL: EDIT KELAS */}
+            <Dialog open={isEditOpen} onOpenChange={(open) => !open && !isSubmitting && setEditOpen(false)}>
+                <DialogContent className="sm:max-w-106.25">
+                    <form onSubmit={handleEditClassroom}>
+                        <DialogHeader>
+                            <DialogTitle>Edit Kelas</DialogTitle>
+                            <DialogDescription>Ubah detail kelas di bawah ini.</DialogDescription>
+                        </DialogHeader>
+                        <div className="grid gap-4 py-4">
+                            <div className="grid gap-2">
+                                <Label htmlFor="edit-name">Nama Kelas</Label>
+                                <Input id="edit-name" value={editForm.name} onChange={(e) => setEditForm((p) => ({ ...p, name: e.target.value }))} disabled={isSubmitting} required />
+                            </div>
+                            <div className="grid gap-2">
+                                <Label htmlFor="edit-semester">Semester</Label>
+                                <Input id="edit-semester" type="number" min={1} max={14} value={editForm.semester} onChange={(e) => setEditForm((p) => ({ ...p, semester: e.target.value }))} disabled={isSubmitting} required />
+                            </div>
+                            <div className="grid gap-2">
+                                <Label htmlFor="edit-kode">Kode Kelas</Label>
+                                <Input id="edit-kode" value={editForm.kode_kelas} onChange={(e) => setEditForm((p) => ({ ...p, kode_kelas: e.target.value }))} disabled={isSubmitting} required />
+                            </div>
+                            <div className="grid gap-2">
+                                <Label htmlFor="edit-deskripsi">Deskripsi (Opsional)</Label>
+                                <Input id="edit-deskripsi" value={editForm.deskripsi} onChange={(e) => setEditForm((p) => ({ ...p, deskripsi: e.target.value }))} disabled={isSubmitting} />
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <input id="edit-active" type="checkbox" checked={editForm.is_active} onChange={(e) => setEditForm((p) => ({ ...p, is_active: e.target.checked }))} disabled={isSubmitting} className="h-4 w-4 rounded border-gray-300" />
+                                <Label htmlFor="edit-active">Kelas Aktif</Label>
+                            </div>
+                        </div>
+                        <DialogFooter>
+                            <Button type="button" variant="outline" onClick={() => setEditOpen(false)} disabled={isSubmitting}>Batal</Button>
+                            <Button type="submit" disabled={isSubmitting}>
+                                {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Menyimpan...</> : 'Simpan Perubahan'}
+                            </Button>
+                        </DialogFooter>
+                    </form>
+                </DialogContent>
+            </Dialog>
+
+            {/* MODAL: HAPUS KELAS */}
+            <Dialog open={isDeleteOpen} onOpenChange={(open) => !open && !isSubmitting && setDeleteOpen(false)}>
+                <DialogContent className="sm:max-w-100">
+                    <DialogHeader>
+                        <DialogTitle>Hapus Kelas</DialogTitle>
+                        <DialogDescription>
+                            Apakah Anda yakin ingin menghapus kelas <strong>{classroom?.name}</strong>? Semua data tugas dan progres mahasiswa di kelas ini akan ikut terhapus. Tindakan ini tidak dapat dibatalkan.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                        <Button type="button" variant="outline" onClick={() => setDeleteOpen(false)} disabled={isSubmitting}>Batal</Button>
+                        <Button variant="destructive" onClick={handleDeleteClassroom} disabled={isSubmitting}>
+                            {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Menghapus...</> : 'Ya, Hapus Kelas'}
+                        </Button>
+                    </DialogFooter>
                 </DialogContent>
             </Dialog>
         </>

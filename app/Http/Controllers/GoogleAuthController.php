@@ -55,6 +55,10 @@ class GoogleAuthController extends Controller
         $existingUser = User::where('google_id', $googleUser->getId())->first();
 
         if ($existingUser) {
+            if ($existingUser->role === 'mahasiswa') {
+                return redirect()->route('login')->with('status', 'Login ke google hanya untuk dosen yang terdaftar');
+            }
+
             Auth::login($existingUser, true);
 
             return redirect()->intended($this->getRedirectPath($existingUser));
@@ -64,6 +68,10 @@ class GoogleAuthController extends Controller
         $emailUser = User::where('email', $googleUser->getEmail())->first();
 
         if ($emailUser) {
+            if ($emailUser->role === 'mahasiswa') {
+                return redirect()->route('login')->with('status', 'Login ke google hanya untuk dosen yang terdaftar');
+            }
+
             $emailUser->update([
                 'google_id' => $googleUser->getId(),
                 'avatar' => $googleUser->getAvatar(),
@@ -87,22 +95,14 @@ class GoogleAuthController extends Controller
                 'kampus' => $kampus,
                 'password' => null,
             ]);
+
+            Auth::login($user, true);
+
+            return redirect()->route($this->getRedirectRoute($user));
         } else {
-            // No invitation → create as mahasiswa (default)
-            $user = User::create([
-                'name' => $googleUser->getName(),
-                'username' => $this->generateUniqueUsername($googleUser->getEmail()),
-                'email' => $googleUser->getEmail(),
-                'google_id' => $googleUser->getId(),
-                'avatar' => $googleUser->getAvatar(),
-                'role' => 'mahasiswa',
-                'password' => null,
-            ]);
+            // No invitation → reject, mahasiswa should not be able to use Google Login
+            return redirect()->route('login')->with('status', 'Login ke google hanya untuk dosen yang terdaftar');
         }
-
-        Auth::login($user, true);
-
-        return redirect()->route($this->getRedirectRoute($user));
     }
 
     /**

@@ -1,5 +1,5 @@
-import { Link, Head } from '@inertiajs/react';
-import { BookOpen, Users, ArrowRight } from 'lucide-react';
+import { Link, Head, router } from '@inertiajs/react';
+import { BookOpen, Users, ArrowRight, MoreVertical, Pencil, Trash2, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
     Card,
@@ -9,6 +9,23 @@ import {
     CardHeader,
     CardTitle,
 } from '@/components/ui/card';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { useState } from 'react';
 
 interface ClassroomType {
     id: number;
@@ -16,6 +33,7 @@ interface ClassroomType {
     semester: string | number;
     deskripsi: string | null;
     kode_kelas: string;
+    is_active?: boolean;
     mahasiswa_count?: number;
     reading_assignments_count?: number;
 }
@@ -25,6 +43,41 @@ export default function Classroom({
 }: {
     classrooms: ClassroomType[];
 }) {
+    const [editTarget, setEditTarget] = useState<ClassroomType | null>(null);
+    const [deleteTarget, setDeleteTarget] = useState<ClassroomType | null>(null);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [editForm, setEditForm] = useState({ name: '', semester: '', kode_kelas: '', deskripsi: '', is_active: true });
+
+    const openEdit = (c: ClassroomType) => {
+        setEditForm({ name: c.name, semester: String(c.semester), kode_kelas: c.kode_kelas, deskripsi: c.deskripsi || '', is_active: c.is_active !== false });
+        setEditTarget(c);
+    };
+
+    const handleEdit = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!editTarget) return;
+        setIsSubmitting(true);
+        router.put(`/dosen/classrooms/${editTarget.kode_kelas}`, {
+            name: editForm.name,
+            semester: parseInt(editForm.semester, 10),
+            kode_kelas: editForm.kode_kelas,
+            deskripsi: editForm.deskripsi,
+            is_active: editForm.is_active,
+        }, {
+            onSuccess: () => { setIsSubmitting(false); setEditTarget(null); },
+            onError: (err) => { setIsSubmitting(false); alert('Gagal: ' + Object.values(err).join(', ')); },
+        });
+    };
+
+    const handleDelete = () => {
+        if (!deleteTarget) return;
+        setIsSubmitting(true);
+        router.delete(`/dosen/classrooms/${deleteTarget.kode_kelas}`, {
+            onSuccess: () => { setIsSubmitting(false); setDeleteTarget(null); },
+            onError: (err) => { setIsSubmitting(false); alert('Gagal: ' + Object.values(err).join(', ')); },
+        });
+    };
+
     return (
         <>
             <Head title="Semua Kelas - Dosen">
@@ -60,9 +113,26 @@ export default function Classroom({
                                         <span className="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary">
                                             Semester {item.semester}
                                         </span>
-                                        <span className="rounded bg-muted px-2 py-0.5 font-mono text-xs font-bold text-muted-foreground">
-                                            Code: {item.kode_kelas}
-                                        </span>
+                                        <div className="flex items-center gap-1">
+                                            <span className="rounded bg-muted px-2 py-0.5 font-mono text-xs font-bold text-muted-foreground">
+                                                Code: {item.kode_kelas}
+                                            </span>
+                                            <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                    <Button variant="ghost" size="icon" className="h-7 w-7">
+                                                        <MoreVertical className="h-4 w-4" />
+                                                    </Button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent align="end">
+                                                    <DropdownMenuItem onClick={() => openEdit(item)}>
+                                                        <Pencil className="mr-2 h-4 w-4" /> Edit Kelas
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => setDeleteTarget(item)}>
+                                                        <Trash2 className="mr-2 h-4 w-4" /> Hapus Kelas
+                                                    </DropdownMenuItem>
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
+                                        </div>
                                     </div>
                                     <CardTitle className="line-clamp-1 text-xl">
                                         {item.name}
@@ -110,6 +180,64 @@ export default function Classroom({
                     </div>
                 )}
             </div>
+
+            {/* MODAL: EDIT KELAS */}
+            <Dialog open={!!editTarget} onOpenChange={(open) => !open && !isSubmitting && setEditTarget(null)}>
+                <DialogContent className="sm:max-w-106.25">
+                    <form onSubmit={handleEdit}>
+                        <DialogHeader>
+                            <DialogTitle>Edit Kelas</DialogTitle>
+                            <DialogDescription>Ubah detail kelas di bawah ini.</DialogDescription>
+                        </DialogHeader>
+                        <div className="grid gap-4 py-4">
+                            <div className="grid gap-2">
+                                <Label htmlFor="idx-edit-name">Nama Kelas</Label>
+                                <Input id="idx-edit-name" value={editForm.name} onChange={(e) => setEditForm((p) => ({ ...p, name: e.target.value }))} disabled={isSubmitting} required />
+                            </div>
+                            <div className="grid gap-2">
+                                <Label htmlFor="idx-edit-semester">Semester</Label>
+                                <Input id="idx-edit-semester" type="number" min={1} max={14} value={editForm.semester} onChange={(e) => setEditForm((p) => ({ ...p, semester: e.target.value }))} disabled={isSubmitting} required />
+                            </div>
+                            <div className="grid gap-2">
+                                <Label htmlFor="idx-edit-kode">Kode Kelas</Label>
+                                <Input id="idx-edit-kode" value={editForm.kode_kelas} onChange={(e) => setEditForm((p) => ({ ...p, kode_kelas: e.target.value }))} disabled={isSubmitting} required />
+                            </div>
+                            <div className="grid gap-2">
+                                <Label htmlFor="idx-edit-deskripsi">Deskripsi (Opsional)</Label>
+                                <Input id="idx-edit-deskripsi" value={editForm.deskripsi} onChange={(e) => setEditForm((p) => ({ ...p, deskripsi: e.target.value }))} disabled={isSubmitting} />
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <input id="idx-edit-active" type="checkbox" checked={editForm.is_active} onChange={(e) => setEditForm((p) => ({ ...p, is_active: e.target.checked }))} disabled={isSubmitting} className="h-4 w-4 rounded border-gray-300" />
+                                <Label htmlFor="idx-edit-active">Kelas Aktif</Label>
+                            </div>
+                        </div>
+                        <DialogFooter>
+                            <Button type="button" variant="outline" onClick={() => setEditTarget(null)} disabled={isSubmitting}>Batal</Button>
+                            <Button type="submit" disabled={isSubmitting}>
+                                {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Menyimpan...</> : 'Simpan Perubahan'}
+                            </Button>
+                        </DialogFooter>
+                    </form>
+                </DialogContent>
+            </Dialog>
+
+            {/* MODAL: HAPUS KELAS */}
+            <Dialog open={!!deleteTarget} onOpenChange={(open) => !open && !isSubmitting && setDeleteTarget(null)}>
+                <DialogContent className="sm:max-w-100">
+                    <DialogHeader>
+                        <DialogTitle>Hapus Kelas</DialogTitle>
+                        <DialogDescription>
+                            Apakah Anda yakin ingin menghapus kelas <strong>{deleteTarget?.name}</strong>? Tindakan ini tidak dapat dibatalkan.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                        <Button type="button" variant="outline" onClick={() => setDeleteTarget(null)} disabled={isSubmitting}>Batal</Button>
+                        <Button variant="destructive" onClick={handleDelete} disabled={isSubmitting}>
+                            {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Menghapus...</> : 'Ya, Hapus Kelas'}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </>
     );
 }

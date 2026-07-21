@@ -215,7 +215,7 @@ class MahasiswaController extends Controller
             $progress->status = 'completed';
             $progress->persentase = 100.00;
             $progress->completed_at = now();
-            $progress->halaman_sekarang = $progress->assignment->total_halaman ?? 0;
+            $progress->halaman_sekarang = $request->current_page ?? $progress->halaman_sekarang;
             
             if ($request->filled('seconds') && $request->seconds > 0) {
                 $progress->total_durasi_detik += $request->seconds;

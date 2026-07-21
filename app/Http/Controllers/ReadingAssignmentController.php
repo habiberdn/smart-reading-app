@@ -7,7 +7,6 @@ use App\Models\ReadingAssignment;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Smalot\PdfParser\Parser;
 
 class ReadingAssignmentController extends Controller
 {
@@ -98,44 +97,5 @@ class ReadingAssignmentController extends Controller
 
         return redirect()->back()->with('message', 'Tugas bacaan berhasil dihapus!');
     }
-
-    /**
-     * Helper to extract raw text from PDF using smalot/pdfparser
-     */
-    private function extractTextFromPdf($filePath)
-    {
-        if (! file_exists($filePath)) {
-            return '';
-        }
-
-        try {
-            $parser = new Parser;
-            $pdf = $parser->parseFile($filePath);
-            $text = $pdf->getText();
-
-            // 1. Sanitize UTF-8 using iconv first (strips malformed bytes)
-            $text = @iconv('UTF-8', 'UTF-8//IGNORE', $text) ?: $text;
-
-            // 2. Remove control characters (but keep \n, \t, \r)
-            $text = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/', '', $text);
-
-            // 3. Clean up whitespace
-            $text = preg_replace('/\r\n|\r/', "\n", $text);
-            $text = preg_replace('/[ \t]+/', ' ', $text);
-            $text = preg_replace('/\n{3,}/', "\n\n", $text);
-            $text = trim($text);
-        } catch (\Exception $e) {
-            $text = '';
-        }
-
-        // Fallback if extraction yielded too little
-        if (mb_strlen($text) < 50) {
-            $text = 'Konten PDF tidak dapat diekstrak secara otomatis. Silakan baca file PDF secara langsung.';
-        }
-
-        // Final safety net: replace any remaining invalid sequences
-        $clean = @iconv('UTF-8', 'UTF-8//IGNORE//TRANSLIT', $text);
-
-        return $clean !== false ? $clean : $text;
-    }
 }
+

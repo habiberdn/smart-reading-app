@@ -20,9 +20,11 @@
             }
         </style>
 
-    <link rel="icon" type="image/png" href="/storage/logo.png">
-    <link rel="apple-touch-icon" href="/storage/logo.png">
-        <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+        <link rel="icon" type="image/png" href="/logo.png">
+        <link rel="icon" type="image/png" href="/storage/logo.png">
+        <link rel="shortcut icon" type="image/png" href="/logo.png">
+        <link rel="apple-touch-icon" href="/logo.png">
+        <link rel="apple-touch-icon" href="/storage/logo.png">
 
         @fonts
 

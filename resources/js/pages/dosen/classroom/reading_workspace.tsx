@@ -12,6 +12,8 @@ import {
     UserCheck,
     BookOpen,
     Check,
+    ZoomIn,
+    X,
 } from 'lucide-react';
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/button';
@@ -67,53 +69,24 @@ interface ReadingWorkspaceProps {
     document?: DocumentData;
 }
 
-const WORDS_PER_PAGE = 250;
-
 /**
- * Memecah konten teks menjadi halaman-halaman berdasarkan paragraf.
- * Setiap halaman berisi ~250 kata. Paragraf tidak dipotong di tengah.
+ * Mengekstrak semua URL gambar [IMG:url] dari konten,
+ * lalu membuat 1 gambar per halaman agar mudah dibaca.
  */
-function splitContentIntoPages(content: string): string[] {
+function extractImagePages(content: string): string[] {
     if (!content || content.trim().length === 0) {
-        return [''];
+        return [];
     }
 
-    const paragraphs = content
-        .split(/\n\s*\n/)
-        .map((p) => p.trim())
-        .filter((p) => p.length > 0);
+    const imgRegex = /\[IMG:([^\]]+)\]/g;
+    const images: string[] = [];
+    let match;
 
-    if (paragraphs.length === 0) {
-        return [content];
+    while ((match = imgRegex.exec(content)) !== null) {
+        images.push(match[1].trim());
     }
 
-    const pages: string[] = [];
-    let currentPageParagraphs: string[] = [];
-    let currentWordCount = 0;
-
-    for (const paragraph of paragraphs) {
-        const paragraphWordCount = paragraph
-            .split(/\s+/)
-            .filter(Boolean).length;
-
-        if (
-            currentWordCount > 0 &&
-            currentWordCount + paragraphWordCount > WORDS_PER_PAGE
-        ) {
-            pages.push(currentPageParagraphs.join('\n\n'));
-            currentPageParagraphs = [paragraph];
-            currentWordCount = paragraphWordCount;
-        } else {
-            currentPageParagraphs.push(paragraph);
-            currentWordCount += paragraphWordCount;
-        }
-    }
-
-    if (currentPageParagraphs.length > 0) {
-        pages.push(currentPageParagraphs.join('\n\n'));
-    }
-
-    return pages.length > 0 ? pages : [''];
+    return images;
 }
 
 export default function ReadingWorkspace({
@@ -124,12 +97,12 @@ export default function ReadingWorkspace({
     const doc = backendDocument;
     const isDosen = auth.user.role === 'dosen';
 
-    // Pagination state
+    // Pagination state — each page = 1 image from the PDF
     const pages = useMemo(
-        () => splitContentIntoPages(doc?.content || ''),
+        () => extractImagePages(doc?.content || ''),
         [doc?.content],
     );
-    const totalPages = pages.length;
+    const totalPages = Math.max(pages.length, 1);
     const initialPage = Math.min(
         Math.max(doc?.halamanSekarang || 0, 0),
         totalPages - 1,
@@ -143,7 +116,6 @@ export default function ReadingWorkspace({
     // Reading tracker state
     const [isPlaying, setIsPlaying] = useState(!isDosen);
     const [secondsSpent, setSecondsSpent] = useState(doc?.totalDurasiDetik || 0);
-    const [lastActivity, setLastActivity] = useState(() => Date.now());
 
     // Session restore dialog state
     const [pendingSession, setPendingSession] = useState<{
@@ -160,15 +132,10 @@ export default function ReadingWorkspace({
             if (saved) {
                 const data = JSON.parse(saved);
 
-                if (
-                    data.currentPage > 0 ||
-                    doc.halamanSekarang > 0
-                ) {
-                    return {
-                        secondsSpent: data.secondsSpent,
-                        currentPage: data.currentPage,
-                    };
-                }
+                return {
+                    secondsSpent: data.secondsSpent,
+                    currentPage: data.currentPage,
+                };
             }
         } catch {
             // ignore
@@ -181,8 +148,14 @@ export default function ReadingWorkspace({
     );
     const [showExitDialog, setShowExitDialog] = useState(false);
     const [showIdleDialog, setShowIdleDialog] = useState(false);
+    const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);    const contentRef = useRef<HTMLDivElement>(null);
+    const lastActivityRef = useRef<number>(Date.now());
+    const unreportedSecondsRef = useRef<number>(0);
+    const currentPageRef = useRef<number>(currentPage);
 
-    const contentRef = useRef<HTMLDivElement>(null);
+    useEffect(() => {
+        currentPageRef.current = currentPage;
+    }, [currentPage]);
 
     // Navigasi halaman
     const goToPage = useCallback(
@@ -193,40 +166,35 @@ export default function ReadingWorkspace({
 
             setSlideDirection(page > currentPage ? 'right' : 'left');
             setIsAnimating(true);
+            setCurrentPage(page);
+
             setTimeout(() => {
-                setCurrentPage(page);
-                contentRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
-                setTimeout(() => setIsAnimating(false), 300);
-            }, 150);
+                setIsAnimating(false);
+            }, 300);
         },
         [currentPage, totalPages, isAnimating],
     );
 
     const goNext = useCallback(
         () => goToPage(currentPage + 1),
-        [currentPage, goToPage],
+        [goToPage, currentPage],
     );
     const goPrev = useCallback(
         () => goToPage(currentPage - 1),
-        [currentPage, goToPage],
+        [goToPage, currentPage],
     );
 
-    // Keyboard navigation (← →)
+    // Keyboard navigation
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
-            if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
-                e.preventDefault();
-                goNext();
-            } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
-                e.preventDefault();
-                goPrev();
-            }
+            if (showSessionDialog || showExitDialog || showIdleDialog || lightboxSrc) return;
+            if (e.key === 'ArrowRight') goNext();
+            if (e.key === 'ArrowLeft') goPrev();
         };
-
         window.addEventListener('keydown', handleKeyDown);
 
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [goNext, goPrev]);
+    }, [goNext, goPrev, showSessionDialog, showExitDialog, showIdleDialog, lightboxSrc]);
 
     // Save session to localStorage on every change
     useEffect(() => {
@@ -279,7 +247,7 @@ export default function ReadingWorkspace({
             return;
         }
 
-        const remainingSeconds = secondsSpent % 10;
+        const remainingSeconds = unreportedSecondsRef.current;
         const pagePercent = totalPages > 0 ? Math.round(((currentPage + 1) / totalPages) * 100) : 0;
 
         router.post(
@@ -298,13 +266,48 @@ export default function ReadingWorkspace({
         );
     };
 
-    // Logika Engine Tracker, Visibility Change, & Anti-Idle 2 Menit (Mahasiswa saja)
+    // Timer: hitung durasi membaca (Mahasiswa saja)
+    // Timer & Auto-Save Progress (Setiap 10 detik "baru")
+    useEffect(() => {
+        if (isDosen || !isPlaying) {
+            return;
+        }
+
+        const timer = setInterval(() => {
+            setSecondsSpent((prev) => prev + 1);
+            unreportedSecondsRef.current += 1;
+
+            // Auto-save setiap kelipatan 10 detik baru
+            if (unreportedSecondsRef.current >= 10 && doc) {
+                const secondsToSend = unreportedSecondsRef.current;
+                const pagePercent = totalPages > 0 ? Math.round(((currentPageRef.current + 1) / totalPages) * 100) : 0;
+                
+                router.post(
+                    `/mahasiswa/read/${doc.id}/progress`,
+                    {
+                        seconds: secondsToSend,
+                        percentage: Math.min(100, Math.max(0, pagePercent)),
+                        current_page: currentPageRef.current,
+                    },
+                    {
+                        preserveScroll: true,
+                        preserveState: true,
+                    },
+                );
+
+                // Reset unreported
+                unreportedSecondsRef.current = 0;
+            }
+        }, 1000);
+
+        return () => clearInterval(timer);
+    }, [isPlaying, isDosen, doc, totalPages]);
+
+    // Visibility Change, Idle Detection & Activity Listeners (Mahasiswa saja)
     useEffect(() => {
         if (isDosen) {
             return;
         }
-
-        let timer: NodeJS.Timeout;
 
         const handleVisibilityChange = () => {
             if (document.hidden) {
@@ -313,7 +316,7 @@ export default function ReadingWorkspace({
         };
 
         const resetIdleTimer = () => {
-            setLastActivity(Date.now());
+            lastActivityRef.current = Date.now();
         };
 
         document.addEventListener('visibilitychange', handleVisibilityChange);
@@ -322,24 +325,18 @@ export default function ReadingWorkspace({
         window.addEventListener('scroll', resetIdleTimer);
         window.addEventListener('keydown', resetIdleTimer);
         window.addEventListener('click', resetIdleTimer);
-
-        if (isPlaying) {
-            timer = setInterval(() => {
-                setSecondsSpent((prev) => prev + 1);
-            }, 1000);
-        }
+        window.addEventListener('touchstart', resetIdleTimer);
 
         const idleCheck = setInterval(() => {
-            const idleTime = (Date.now() - lastActivity) / 1000;
+            const idleTime = (Date.now() - lastActivityRef.current) / 1000;
 
-            if (idleTime >= 120) {
+            if (idleTime >= 10) {
                 setIsPlaying(false);
                 setShowIdleDialog(true);
             }
-        }, 5000);
+        }, 2000);
 
         return () => {
-            clearInterval(timer);
             clearInterval(idleCheck);
             document.removeEventListener(
                 'visibilitychange',
@@ -350,34 +347,9 @@ export default function ReadingWorkspace({
             window.removeEventListener('scroll', resetIdleTimer);
             window.removeEventListener('keydown', resetIdleTimer);
             window.removeEventListener('click', resetIdleTimer);
+            window.removeEventListener('touchstart', resetIdleTimer);
         };
-    }, [isPlaying, lastActivity, isDosen]);
-
-    // Auto-Save Progress (page-based) ke DB Setiap Kelipatan 10 Detik
-    useEffect(() => {
-        if (isDosen || !doc || secondsSpent === 0 || secondsSpent % 10 !== 0) {
-            return;
-        }
-
-        const pagePercent =
-            totalPages > 0
-                ? Math.round(((currentPage + 1) / totalPages) * 100)
-                : 0;
-        const finalPercent = Math.min(100, Math.max(0, pagePercent));
-
-        router.post(
-            `/mahasiswa/read/${doc.id}/progress`,
-            {
-                seconds: 10,
-                percentage: finalPercent,
-                current_page: currentPage,
-            },
-            {
-                preserveScroll: true,
-                preserveState: true,
-            },
-        );
-    }, [secondsSpent, isDosen, currentPage, totalPages, doc]);
+    }, [isDosen]);
 
     if (!doc) {
         return (
@@ -402,268 +374,6 @@ export default function ReadingWorkspace({
         return `${minutes}m ${seconds < 10 ? '0' : ''}${seconds}s`;
     };
 
-    const parseInlineStyles = (text: string): React.ReactNode => {
-        const formatted = text
-            .replace(/<\/?(strong|b)>/g, '**')
-            .replace(/<\/?(em|i)>/g, '*')
-            .replace(/<\/?u>/g, '__');
-
-        const regex = /(\*\*.*?\*\*|\*.*?\*|__.*?__)/g;
-        const parts = formatted.split(regex);
-
-        return (
-            <>
-                {parts.map((part, index) => {
-                    if (part.startsWith('**') && part.endsWith('**')) {
-                        return (
-                            <strong
-                                key={index}
-                                className="font-bold text-foreground"
-                            >
-                                {part.slice(2, -2)}
-                            </strong>
-                        );
-                    }
-
-                    if (part.startsWith('*') && part.endsWith('*')) {
-                        return (
-                            <em key={index} className="text-foreground italic">
-                                {part.slice(1, -1)}
-                            </em>
-                        );
-                    }
-
-                    if (part.startsWith('__') && part.endsWith('__')) {
-                        return (
-                            <span
-                                key={index}
-                                className="text-foreground underline"
-                            >
-                                {part.slice(2, -2)}
-                            </span>
-                        );
-                    }
-
-                    return part;
-                })}
-            </>
-        );
-    };
-
-    const renderParagraph = (paragraphText: string, idx: number) => {
-        const rawLines = paragraphText
-            .split('\n')
-            .map((l) => l.trim())
-            .filter(Boolean);
-
-        type ParsedElement =
-            | {
-                type: 'heading';
-                level: number;
-                text: string;
-                shouldCenter: boolean;
-            }
-            | { type: 'list-unordered'; text: string }
-            | { type: 'list-ordered'; value: number; text: string }
-            | { type: 'text'; text: string; shouldCenter: boolean }
-            | { type: 'image'; src: string };
-
-        const elements: ParsedElement[] = [];
-        let currentTextGroup: string[] = [];
-
-        const flushTextGroup = () => {
-            if (currentTextGroup.length > 0) {
-                const combinedText = currentTextGroup.join(' ');
-                const isCenterHtml =
-                    combinedText.startsWith('<center>') &&
-                    combinedText.endsWith('</center>');
-                const cleanText = isCenterHtml
-                    ? combinedText.slice(8, -9).trim()
-                    : combinedText;
-
-                const isAcademicHeading =
-                    /^(BAB|CHAPTER|Bab|Chapter)\s+([IVXLCDM\d]+)/i.test(
-                        cleanText,
-                    ) && cleanText.length < 100;
-                const isAllCapsHeading =
-                    cleanText === cleanText.toUpperCase() &&
-                    /[A-Z]/.test(cleanText) &&
-                    cleanText.length < 80;
-
-                elements.push({
-                    type: 'text',
-                    text: cleanText,
-                    shouldCenter:
-                        isCenterHtml || isAcademicHeading || isAllCapsHeading,
-                });
-                currentTextGroup = [];
-            }
-        };
-
-        for (const line of rawLines) {
-            const isCenterHtml =
-                line.startsWith('<center>') && line.endsWith('</center>');
-            const cleanLine = isCenterHtml ? line.slice(8, -9).trim() : line;
-
-            const imgMatch = cleanLine.match(/^\[IMG:(.+)\]$/);
-            if (imgMatch) {
-                flushTextGroup();
-                elements.push({
-                    type: 'image',
-                    src: imgMatch[1].trim(),
-                });
-                continue;
-            }
-
-            const isMarkdownHeading =
-                cleanLine.startsWith('# ') ||
-                cleanLine.startsWith('## ') ||
-                cleanLine.startsWith('### ');
-            const isAcademicHeading =
-                /^(BAB|CHAPTER|Bab|Chapter)\s+([IVXLCDM\d]+)/i.test(
-                    cleanLine,
-                ) && cleanLine.length < 100;
-            const isAllCapsHeading =
-                cleanLine === cleanLine.toUpperCase() &&
-                /[A-Z]/.test(cleanLine) &&
-                cleanLine.length < 80 &&
-                !cleanLine.endsWith('.');
-
-            const isHeading =
-                isMarkdownHeading || isAcademicHeading || isAllCapsHeading;
-
-            const isUnorderedList =
-                cleanLine.startsWith('- ') || cleanLine.startsWith('* ');
-            const numMatch = cleanLine.match(/^(\d+)\.\s+(.*)$/);
-            const isOrderedList = !!numMatch;
-
-            if (isHeading || isUnorderedList || isOrderedList) {
-                flushTextGroup();
-
-                if (isHeading) {
-                    let level = 2;
-                    let text = cleanLine;
-
-                    if (cleanLine.startsWith('# ')) {
-                        level = 1;
-                        text = cleanLine.slice(2);
-                    } else if (cleanLine.startsWith('## ')) {
-                        level = 2;
-                        text = cleanLine.slice(3);
-                    } else if (cleanLine.startsWith('### ')) {
-                        level = 3;
-                        text = cleanLine.slice(4);
-                    }
-
-                    elements.push({
-                        type: 'heading',
-                        level,
-                        text,
-                        shouldCenter:
-                            isCenterHtml ||
-                            cleanLine.startsWith('# ') ||
-                            isAcademicHeading ||
-                            isAllCapsHeading,
-                    });
-                } else if (isUnorderedList) {
-                    elements.push({
-                        type: 'list-unordered',
-                        text: cleanLine.slice(2),
-                    });
-                } else if (isOrderedList && numMatch) {
-                    elements.push({
-                        type: 'list-ordered',
-                        value: parseInt(numMatch[1], 10),
-                        text: numMatch[2],
-                    });
-                }
-            } else {
-                currentTextGroup.push(line);
-            }
-        }
-
-        flushTextGroup();
-
-        return (
-            <div key={idx} className="flex w-full flex-col">
-                {elements.map((el, elIdx) => {
-                    switch (el.type) {
-                        case 'heading': {
-                            const headingClasses =
-                                {
-                                    1: 'text-2xl font-extrabold text-foreground mt-6 mb-4 tracking-tight border-b pb-2',
-                                    2: 'text-xl font-bold text-foreground mt-5 mb-3',
-                                    3: 'text-lg font-semibold text-foreground mt-4 mb-2',
-                                }[el.level as 1 | 2 | 3] ||
-                                'text-xl font-bold text-foreground mt-5 mb-3';
-
-                            return (
-                                <div
-                                    key={elIdx}
-                                    className={
-                                        el.shouldCenter
-                                            ? 'w-full text-center'
-                                            : 'text-left'
-                                    }
-                                >
-                                    <h2 className={headingClasses}>
-                                        {parseInlineStyles(el.text)}
-                                    </h2>
-                                </div>
-                            );
-                        }
-                        case 'list-unordered':
-                            return (
-                                <ul
-                                    key={elIdx}
-                                    className="mb-2 ml-6 list-inside list-disc text-justify text-sm leading-relaxed tracking-wide text-foreground sm:text-base"
-                                >
-                                    <li>{parseInlineStyles(el.text)}</li>
-                                </ul>
-                            );
-                        case 'list-ordered':
-                            return (
-                                <ol
-                                    key={elIdx}
-                                    className="mb-2 ml-6 list-inside list-decimal text-justify text-sm leading-relaxed tracking-wide text-foreground sm:text-base"
-                                >
-                                    <li value={el.value}>
-                                        {parseInlineStyles(el.text)}
-                                    </li>
-                                </ol>
-                            );
-                        case 'image':
-                            return (
-                                <div
-                                    key={elIdx}
-                                    className="my-6 flex flex-col items-center justify-center gap-2"
-                                >
-                                    <img
-                                        src={el.src}
-                                        alt="Gambar Dokumen"
-                                        className="max-h-[70vh] max-w-full rounded-lg border bg-background p-1.5 shadow-sm object-contain transition-transform hover:scale-[1.02]"
-                                    />
-                                    <span className="text-xs text-muted-foreground italic">
-                                        Gambar pendukung dari dokumen asli
-                                    </span>
-                                </div>
-                            );
-                        case 'text':
-                            return (
-                                <p
-                                    key={elIdx}
-                                    className={`mb-4 text-justify text-sm leading-relaxed tracking-wide text-foreground sm:text-base ${el.shouldCenter ? 'text-center font-bold' : 'indent-8'}`}
-                                >
-                                    {parseInlineStyles(el.text)}
-                                </p>
-                            );
-                        default:
-                            return null;
-                    }
-                })}
-            </div>
-        );
-    };
 
     if (!doc) {
         return (
@@ -783,18 +493,36 @@ export default function ReadingWorkspace({
                         <CardContent className="px-0 pt-0 pb-0">
                             <div
                                 ref={contentRef}
-                                className="max-h-[70vh] min-h-[65vh] overflow-y-auto px-4 py-6 sm:px-10 md:px-16 lg:px-20"
+                                className="max-h-[70vh] min-h-[65vh] overflow-y-auto px-4 py-6 sm:px-6 md:px-8 lg:px-10"
                                 style={{ scrollBehavior: 'smooth' }}
                             >
-                                <article
-                                    className={`prose prose-slate max-w-none text-sm leading-relaxed tracking-wide text-foreground transition-all duration-300 ease-in-out sm:text-base ${isAnimating ? (slideDirection === 'right' ? 'translate-x-4 opacity-0' : '-translate-x-4 opacity-0') : 'translate-x-0 opacity-100'} `}
+                                <div
+                                    className={`flex items-center justify-center transition-all duration-300 ease-in-out ${isAnimating ? (slideDirection === 'right' ? 'translate-x-4 opacity-0' : '-translate-x-4 opacity-0') : 'translate-x-0 opacity-100'}`}
                                 >
-                                    {pages[currentPage]
-                                        ?.split('\n\n')
-                                        .map((paragraph, idx) =>
-                                            renderParagraph(paragraph, idx),
-                                        )}
-                                </article>
+                                    {pages.length > 0 && pages[currentPage] ? (
+                                        <button
+                                            type="button"
+                                            onClick={() => setLightboxSrc(pages[currentPage])}
+                                            className="group relative w-full cursor-zoom-in rounded-lg border bg-background p-1 shadow-sm transition-all hover:shadow-md focus:outline-none focus:ring-2 focus:ring-primary/50"
+                                        >
+                                            <img
+                                                src={pages[currentPage]}
+                                                alt={`Halaman ${currentPage + 1}`}
+                                                className="w-full h-auto rounded-md"
+                                            />
+                                            <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-black/0 transition-colors group-hover:bg-black/10">
+                                                <span className="flex items-center gap-1.5 rounded-full bg-black/60 px-3 py-1.5 text-xs font-medium text-white opacity-0 transition-opacity group-hover:opacity-100">
+                                                    <ZoomIn className="h-3.5 w-3.5" /> Tap untuk zoom
+                                                </span>
+                                            </div>
+                                        </button>
+                                    ) : (
+                                        <div className="flex flex-col items-center gap-3 py-20 text-muted-foreground">
+                                            <AlertCircle className="h-10 w-10" />
+                                            <p className="text-sm">Tidak ada gambar yang ditemukan dalam dokumen ini.</p>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
 
                             {/* Page Navigation Bar */}
@@ -989,7 +717,7 @@ export default function ReadingWorkspace({
                                     <div className="flex items-center gap-2 pt-1">
                                         <span className="h-2 w-2 animate-ping rounded-full bg-emerald-500" />
                                         <span className="font-semibold text-foreground">
-                                            Anti-Idle 2 Menit Aktif
+                                            Anti-Idle 10 Detik Aktif (Testing)
                                         </span>
                                     </div>
                                 </>
@@ -1092,6 +820,7 @@ export default function ReadingWorkspace({
                                 setShowSessionDialog(false);
                                 setPendingSession(null);
                                 setSecondsSpent(0);
+                                setCurrentPage(0);
                             }}
                         >
                             Mulai Baru
@@ -1164,7 +893,7 @@ export default function ReadingWorkspace({
                     <DialogHeader>
                         <DialogTitle>Sesi Di-pause</DialogTitle>
                         <DialogDescription>
-                            Sesi membaca di-pause karena tidak ada aktivitas selama 2 menit.
+                            Sesi membaca di-pause karena tidak ada aktivitas selama 10 detik.
                             Klik &quot;Lanjutkan&quot; untuk meneruskan membaca.
                         </DialogDescription>
                     </DialogHeader>
@@ -1173,7 +902,7 @@ export default function ReadingWorkspace({
                             onClick={() => {
                                 setShowIdleDialog(false);
                                 setIsPlaying(true);
-                                setLastActivity(Date.now());
+                                lastActivityRef.current = Date.now();
                             }}
                         >
                             Lanjutkan
@@ -1181,6 +910,33 @@ export default function ReadingWorkspace({
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            {/* Image Lightbox/Zoom Overlay */}
+            {lightboxSrc && (
+                <div
+                    className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-sm"
+                    onClick={() => setLightboxSrc(null)}
+                >
+                    <button
+                        type="button"
+                        onClick={() => setLightboxSrc(null)}
+                        className="absolute top-4 right-4 z-[101] rounded-full bg-white/20 p-2 text-white transition-colors hover:bg-white/40"
+                    >
+                        <X className="h-6 w-6" />
+                    </button>
+                    <div
+                        className="max-h-[95vh] max-w-[95vw] overflow-auto"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <img
+                            src={lightboxSrc}
+                            alt="Zoom Gambar"
+                            className="h-auto min-w-[90vw] sm:min-w-0 sm:max-w-[90vw] object-contain"
+                            style={{ touchAction: 'pinch-zoom' }}
+                        />
+                    </div>
+                </div>
+            )}
         </>
     );
 }

@@ -19,7 +19,9 @@ use Inertia\Inertia;
 Route::middleware(['guest'])->group(function () {
     // 1. Menampilkan Halaman Login (Inertia)
     Route::get('/login', function () {
-        return Inertia::render('auth/login');
+        return Inertia::render('auth/login', [
+            'status' => session('status'),
+        ]);
     })->name('login');
 });
 
@@ -38,6 +40,8 @@ Route::middleware(['auth', 'role:dosen'])->prefix('dosen')->name('dosen.')->grou
     Route::get('/classrooms/{kode}', [ClassroomController::class, 'show'])->name('classDetails');
     Route::get('/classrooms', [ClassroomController::class, 'index'])->name('classrooms');
     Route::post('/classrooms', [ClassroomController::class, 'store'])->name('classrooms.store');
+    Route::put('/classrooms/{kode}', [ClassroomController::class, 'update'])->name('classrooms.update');
+    Route::delete('/classrooms/{kode}', [ClassroomController::class, 'destroy'])->name('classrooms.destroy');
     Route::post('/classrooms/{kode}/assignments', [ReadingAssignmentController::class, 'store'])->name('classrooms.assignments.store');
     Route::delete('/assignments/{id}', [ReadingAssignmentController::class, 'destroy'])->name('assignments.destroy');
 });

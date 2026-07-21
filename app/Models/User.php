@@ -116,8 +116,17 @@ class User extends Authenticatable
                      ->pluck('tanggal')
                      ->map(fn($d) => \Carbon\Carbon::parse($d));
 
+        if ($logs->isEmpty()) {
+            return 0;
+        }
+
         $streak = 0;
         $check  = now()->startOfDay();
+
+        // If today has no log yet, start checking from yesterday
+        if (!$logs->first()->equalTo($check)) {
+            $check = $check->subDay();
+        }
 
         foreach ($logs as $tanggal) {
             if ($tanggal->equalTo($check)) {
