@@ -146,6 +146,16 @@ export default function Login({ status }: Props) {
                                 Daftar
                             </TextLink>
                         </div>
+
+                        <div className="pt-2 text-center text-xs text-muted-foreground/80 space-x-3">
+                            <a href="/privacy-policy" className="hover:underline hover:text-foreground">
+                                Kebijakan Privasi
+                            </a>
+                            <span>•</span>
+                            <a href="/terms-of-service" className="hover:underline hover:text-foreground">
+                                Ketentuan Layanan
+                            </a>
+                        </div>
                     </>
                 )}
             </Form>

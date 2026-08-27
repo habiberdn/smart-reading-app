@@ -14,9 +14,14 @@ import {
     Check,
     ZoomIn,
     X,
+    Loader2,
 } from 'lucide-react';
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import * as pdfjsLib from 'pdfjs-dist';
+import pdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import { Button } from '@/components/ui/button';
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
 import {
     Card,
     CardContent,
@@ -97,12 +102,28 @@ export default function ReadingWorkspace({
     const doc = backendDocument;
     const isDosen = auth.user.role === 'dosen';
 
-    // Pagination state — each page = 1 image from the PDF
-    const pages = useMemo(
+    // Server-extracted images (if available)
+    const serverPages = useMemo(
         () => extractImagePages(doc?.content || ''),
         [doc?.content],
     );
-    const totalPages = Math.max(pages.length, 1);
+
+    // Client-side PDF rendering state (PDF.js)
+    const [pdfDoc, setPdfDoc] = useState<pdfjsLib.PDFDocumentProxy | null>(null);
+    const [pdfLoading, setPdfLoading] = useState<boolean>(() => serverPages.length === 0 && !!doc?.fileUrl);
+    const [pdfError, setPdfError] = useState<string | null>(null);
+    const [pageCache, setPageCache] = useState<{ [page: number]: string }>({});
+    const [renderingPage, setRenderingPage] = useState<boolean>(false);
+    const [clientTotalPages, setClientTotalPages] = useState<number>(doc?.totalHalaman || 1);
+
+    // Total pages calculation: server extracted images -> PDF.js numPages -> backend total_halaman -> 1
+    const totalPages = useMemo(() => {
+        if (serverPages.length > 0) return serverPages.length;
+        if (pdfDoc) return pdfDoc.numPages;
+        if (clientTotalPages > 0) return clientTotalPages;
+        return Math.max(doc?.totalHalaman || 1, 1);
+    }, [serverPages.length, pdfDoc, clientTotalPages, doc?.totalHalaman]);
+
     const initialPage = Math.min(
         Math.max(doc?.halamanSekarang || 0, 0),
         totalPages - 1,
@@ -116,6 +137,106 @@ export default function ReadingWorkspace({
     // Reading tracker state
     const [isPlaying, setIsPlaying] = useState(!isDosen);
     const [secondsSpent, setSecondsSpent] = useState(doc?.totalDurasiDetik || 0);
+
+    // 1. Load the PDF document if server-side images are not present
+    useEffect(() => {
+        if (serverPages.length > 0 || !doc?.fileUrl) {
+            setPdfLoading(false);
+            return;
+        }
+
+        let isMounted = true;
+        let activeLoadingTask: pdfjsLib.PDFDocumentLoadingTask | null = null;
+        setPdfLoading(true);
+        setPdfError(null);
+
+        fetch(doc.fileUrl, { credentials: 'same-origin' })
+            .then((res) => {
+                if (!res.ok) {
+                    throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+                }
+                return res.arrayBuffer();
+            })
+            .then((arrayBuffer) => {
+                if (!isMounted) return;
+                activeLoadingTask = pdfjsLib.getDocument({
+                    data: new Uint8Array(arrayBuffer),
+                });
+                return activeLoadingTask.promise;
+            })
+            .then((loadedPdf) => {
+                if (!isMounted || !loadedPdf) return;
+                setPdfDoc(loadedPdf);
+                setClientTotalPages(loadedPdf.numPages);
+                setPdfLoading(false);
+            })
+            .catch((err) => {
+                if (!isMounted) return;
+                console.error('Gagal memuat PDF:', err);
+                setPdfError('Gagal memuat file PDF. Pastikan file PDF dapat diakses.');
+                setPdfLoading(false);
+            });
+
+        return () => {
+            isMounted = false;
+            if (activeLoadingTask) {
+                activeLoadingTask.destroy();
+            }
+        };
+    }, [doc?.fileUrl, serverPages.length]);
+
+    // 2. Render the current page (and pre-render adjacent pages) to canvas dataURL
+    useEffect(() => {
+        if (serverPages.length > 0 || !pdfDoc) return;
+
+        const pageNum = currentPage + 1;
+        if (pageNum < 1 || pageNum > pdfDoc.numPages) return;
+
+        if (pageCache[currentPage]) return; // Page is already cached
+
+        let isCancelled = false;
+        setRenderingPage(true);
+
+        pdfDoc
+            .getPage(pageNum)
+            .then(async (page) => {
+                if (isCancelled) return;
+                // High-resolution scale for sharp display and zoom
+                const viewport = page.getViewport({ scale: 2.0 });
+                const canvas = window.document.createElement('canvas');
+                const context = canvas.getContext('2d');
+                canvas.height = viewport.height;
+                canvas.width = viewport.width;
+
+                if (!context) {
+                    setRenderingPage(false);
+                    
+                    return;
+                }
+
+                await page.render({
+                    canvas: canvas,
+                    canvasContext: context,
+                    viewport: viewport,
+                }).promise;
+
+                if (!isCancelled) {
+                    const dataUrl = canvas.toDataURL('image/png');
+                    setPageCache((prev) => ({ ...prev, [currentPage]: dataUrl }));
+                    setRenderingPage(false);
+                }
+            })
+            .catch((err) => {
+                if (!isCancelled) {
+                    console.error('Gagal merender halaman PDF:', err);
+                    setRenderingPage(false);
+                }
+            });
+
+        return () => {
+            isCancelled = true;
+        };
+    }, [pdfDoc, currentPage, pageCache, serverPages.length]);
 
     // Session restore dialog state
     const [pendingSession, setPendingSession] = useState<{
@@ -499,29 +620,75 @@ export default function ReadingWorkspace({
                                 <div
                                     className={`flex items-center justify-center transition-all duration-300 ease-in-out ${isAnimating ? (slideDirection === 'right' ? 'translate-x-4 opacity-0' : '-translate-x-4 opacity-0') : 'translate-x-0 opacity-100'}`}
                                 >
-                                    {pages.length > 0 && pages[currentPage] ? (
-                                        <button
-                                            type="button"
-                                            onClick={() => setLightboxSrc(pages[currentPage])}
-                                            className="group relative w-full cursor-zoom-in rounded-lg border bg-background p-1 shadow-sm transition-all hover:shadow-md focus:outline-none focus:ring-2 focus:ring-primary/50"
-                                        >
-                                            <img
-                                                src={pages[currentPage]}
-                                                alt={`Halaman ${currentPage + 1}`}
-                                                className="w-full h-auto rounded-md"
-                                            />
-                                            <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-black/0 transition-colors group-hover:bg-black/10">
-                                                <span className="flex items-center gap-1.5 rounded-full bg-black/60 px-3 py-1.5 text-xs font-medium text-white opacity-0 transition-opacity group-hover:opacity-100">
-                                                    <ZoomIn className="h-3.5 w-3.5" /> Tap untuk zoom
-                                                </span>
+                                    {(() => {
+                                        const currentImageSrc = serverPages.length > 0 ? serverPages[currentPage] : pageCache[currentPage];
+
+                                        if (pdfLoading || (renderingPage && !currentImageSrc)) {
+                                            return (
+                                                <div className="flex flex-col items-center justify-center py-28 text-muted-foreground gap-3">
+                                                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                                                    <p className="text-sm font-medium">Memuat halaman {currentPage + 1}...</p>
+                                                </div>
+                                            );
+                                        }
+
+                                        if (currentImageSrc) {
+                                            return (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setLightboxSrc(currentImageSrc)}
+                                                    className="group relative w-full cursor-zoom-in rounded-lg border bg-background p-1 shadow-sm transition-all hover:shadow-md focus:outline-none focus:ring-2 focus:ring-primary/50"
+                                                >
+                                                    <img
+                                                        src={currentImageSrc}
+                                                        alt={`Halaman ${currentPage + 1}`}
+                                                        className="w-full h-auto rounded-md"
+                                                    />
+                                                    <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-black/0 transition-colors group-hover:bg-black/10">
+                                                        <span className="flex items-center gap-1.5 rounded-full bg-black/60 px-3 py-1.5 text-xs font-medium text-white opacity-0 transition-opacity group-hover:opacity-100">
+                                                            <ZoomIn className="h-3.5 w-3.5" /> Tap untuk zoom
+                                                        </span>
+                                                    </div>
+                                                </button>
+                                            );
+                                        }
+
+                                        if (pdfError) {
+                                            return (
+                                                <div className="flex flex-col items-center gap-3 py-20 text-muted-foreground text-center">
+                                                    <AlertCircle className="h-10 w-10 text-destructive" />
+                                                    <p className="text-sm font-medium text-destructive">{pdfError}</p>
+                                                    {doc?.fileUrl && (
+                                                        <a
+                                                            href={doc.fileUrl}
+                                                            target="_blank"
+                                                            rel="noreferrer"
+                                                            className="text-xs text-primary underline mt-2"
+                                                        >
+                                                            Buka file PDF secara langsung
+                                                        </a>
+                                                    )}
+                                                </div>
+                                            );
+                                        }
+
+                                        return (
+                                            <div className="flex flex-col items-center gap-3 py-20 text-muted-foreground text-center">
+                                                <AlertCircle className="h-10 w-10" />
+                                                <p className="text-sm">Tidak ada halaman yang dapat ditampilkan untuk dokumen ini.</p>
+                                                {doc?.fileUrl && (
+                                                    <a
+                                                        href={doc.fileUrl}
+                                                        target="_blank"
+                                                        rel="noreferrer"
+                                                        className="text-xs text-primary underline mt-2"
+                                                    >
+                                                        Buka file PDF secara langsung
+                                                    </a>
+                                                )}
                                             </div>
-                                        </button>
-                                    ) : (
-                                        <div className="flex flex-col items-center gap-3 py-20 text-muted-foreground">
-                                            <AlertCircle className="h-10 w-10" />
-                                            <p className="text-sm">Tidak ada gambar yang ditemukan dalam dokumen ini.</p>
-                                        </div>
-                                    )}
+                                        );
+                                    })()}
                                 </div>
                             </div>
 

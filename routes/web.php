@@ -25,8 +25,18 @@ Route::middleware(['guest'])->group(function () {
     })->name('login');
 });
 
+// Halaman Publik (Privacy Policy & Terms of Service untuk Google OAuth)
+Route::get('/privacy-policy', function () {
+    return Inertia::render('privacy-policy');
+})->name('privacy.policy');
+
+Route::get('/terms-of-service', function () {
+    return Inertia::render('terms-of-service');
+})->name('terms.of.service');
+
 Route::middleware(['auth'])->group(function () {
     Route::get('/read/{assignment_id}', [ReadingController::class, 'show'])->name('reading.workspace');
+    Route::get('/read/{assignment_id}/file', [ReadingController::class, 'streamFile'])->name('reading.file');
     Route::inertia('/dashboard', 'app')->name('dashboard');
     Route::get('/assignments', [MahasiswaController::class, 'assignmentsList'])->name('assignments');
     Route::get('/explore', [MahasiswaController::class, 'exploreList'])->name('explore');

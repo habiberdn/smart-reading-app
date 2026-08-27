@@ -40,8 +40,8 @@ class ReadingAssignmentController extends Controller
         $averageSentenceLength = $extraction['average_sentence_length'];
         $technicalWordCount = $extraction['technical_word_count'];
 
-        // Difficulty berdasarkan jumlah halaman
-        $totalHalaman = max(1, ceil($wordCount / 250));
+        // Gunakan jumlah halaman PDF fisik sebenarnya
+        $totalHalaman = !empty($extraction['total_pages']) ? (int) $extraction['total_pages'] : max(1, ceil($wordCount / 250));
         $tingkatKesulitan = 'easy';
         $difficultyScore = 15;
 

@@ -32,7 +32,7 @@ class GoogleAuthController extends Controller
      */
     public function redirect()
     {
-        return Socialite::driver('google')->redirect();
+        return Socialite::driver('google')->stateless()->redirect();
     }
 
     /**
@@ -44,9 +44,12 @@ class GoogleAuthController extends Controller
     public function callback(Request $request)
     {
         try {
-            $googleUser = Socialite::driver('google')->user();
-        } catch (\Exception $e) {
-            return redirect()->route('login')->with('status', 'Gagal login dengan Google. Silakan coba lagi.');
+            $googleUser = Socialite::driver('google')->stateless()->user();
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('Google OAuth Error: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString(),
+            ]);
+            return redirect()->route('login')->with('status', 'Gagal login dengan Google: ' . $e->getMessage());
         }
 
         $kampus = $request->session()->pull('invitation_kampus');

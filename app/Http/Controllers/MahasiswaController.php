@@ -24,9 +24,10 @@ class MahasiswaController extends Controller
         // 2. Fetch assignments inside those classrooms
         $assignments = ReadingAssignment::whereIn('classroom_id', $classroomIds)
             ->published()
+            ->without('content')
             ->with(['classroom.dosen'])
             ->latest()
-            ->get()
+            ->get(['id', 'classroom_id', 'dosen_id', 'judul', 'deskripsi', 'file_path', 'file_url', 'file_type', 'total_halaman', 'deadline', 'estimasi_durasi', 'tingkat_kesulitan', 'is_published', 'published_at', 'word_count', 'sentence_count', 'average_sentence_length', 'technical_word_count', 'difficulty_score', 'created_at', 'updated_at', 'deleted_at'])
             ->map(function ($assignment) {
                 $assignment->is_classroom_member = true;
                 return $assignment;
@@ -267,7 +268,7 @@ class MahasiswaController extends Controller
             ->published()
             ->with(['classroom.dosen'])
             ->latest()
-            ->get()
+            ->get(['id', 'classroom_id', 'dosen_id', 'judul', 'deskripsi', 'file_path', 'file_url', 'file_type', 'total_halaman', 'deadline', 'estimasi_durasi', 'tingkat_kesulitan', 'is_published', 'published_at', 'word_count', 'sentence_count', 'average_sentence_length', 'technical_word_count', 'difficulty_score', 'created_at', 'updated_at', 'deleted_at'])
             ->map(function ($assignment) {
                 $assignment->is_classroom_member = true;
                 return $assignment;
@@ -288,7 +289,7 @@ class MahasiswaController extends Controller
             ->published()
             ->with(['classroom.dosen'])
             ->latest()
-            ->get()
+            ->get(['id', 'classroom_id', 'dosen_id', 'judul', 'deskripsi', 'file_path', 'file_url', 'file_type', 'total_halaman', 'deadline', 'estimasi_durasi', 'tingkat_kesulitan', 'is_published', 'published_at', 'word_count', 'sentence_count', 'average_sentence_length', 'technical_word_count', 'difficulty_score', 'created_at', 'updated_at', 'deleted_at'])
             ->map(function ($assignment) {
                 $assignment->is_classroom_member = false;
                 return $assignment;
