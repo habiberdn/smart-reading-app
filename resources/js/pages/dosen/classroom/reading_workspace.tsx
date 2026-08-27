@@ -74,26 +74,6 @@ interface ReadingWorkspaceProps {
     document?: DocumentData;
 }
 
-/**
- * Mengekstrak semua URL gambar [IMG:url] dari konten,
- * lalu membuat 1 gambar per halaman agar mudah dibaca.
- */
-function extractImagePages(content: string): string[] {
-    if (!content || content.trim().length === 0) {
-        return [];
-    }
-
-    const imgRegex = /\[IMG:([^\]]+)\]/g;
-    const images: string[] = [];
-    let match;
-
-    while ((match = imgRegex.exec(content)) !== null) {
-        images.push(match[1].trim());
-    }
-
-    return images;
-}
-
 export default function ReadingWorkspace({
     auth,
     document: backendDocument,
@@ -102,45 +82,51 @@ export default function ReadingWorkspace({
     const doc = backendDocument;
     const isDosen = auth.user.role === 'dosen';
 
-    // Server-extracted images (if available)
-    const serverPages = useMemo(
-        () => extractImagePages(doc?.content || ''),
-        [doc?.content],
-    );
-
     // Client-side PDF rendering state (PDF.js)
     const [pdfDoc, setPdfDoc] = useState<pdfjsLib.PDFDocumentProxy | null>(null);
-    const [pdfLoading, setPdfLoading] = useState<boolean>(() => serverPages.length === 0 && !!doc?.fileUrl);
+    const [pdfLoading, setPdfLoading] = useState<boolean>(() => !!doc?.fileUrl);
     const [pdfError, setPdfError] = useState<string | null>(null);
     const [pageCache, setPageCache] = useState<{ [page: number]: string }>({});
     const [renderingPage, setRenderingPage] = useState<boolean>(false);
     const [clientTotalPages, setClientTotalPages] = useState<number>(doc?.totalHalaman || 1);
 
-    // Total pages calculation: server extracted images -> PDF.js numPages -> backend total_halaman -> 1
+    // Total pages calculation: PDF.js numPages -> clientTotalPages -> backend total_halaman -> 1
     const totalPages = useMemo(() => {
-        if (serverPages.length > 0) return serverPages.length;
         if (pdfDoc) return pdfDoc.numPages;
         if (clientTotalPages > 0) return clientTotalPages;
         return Math.max(doc?.totalHalaman || 1, 1);
-    }, [serverPages.length, pdfDoc, clientTotalPages, doc?.totalHalaman]);
+    }, [pdfDoc, clientTotalPages, doc?.totalHalaman]);
+
+    // Backend sends 1-based halamanSekarang (default 1). Convert to 0-based index.
+    const backendPageIndex = doc?.halamanSekarang ? Math.max(0, doc.halamanSekarang - 1) : 0;
 
     const initialPage = Math.min(
-        Math.max(doc?.halamanSekarang || 0, 0),
-        totalPages - 1,
+        backendPageIndex,
+        Math.max(0, totalPages - 1),
     );
     const [currentPage, setCurrentPage] = useState(initialPage);
     const [isAnimating, setIsAnimating] = useState(false);
     const [slideDirection, setSlideDirection] = useState<'left' | 'right'>(
         'right',
     );
+    const initialPageSetRef = useRef(false);
 
     // Reading tracker state
     const [isPlaying, setIsPlaying] = useState(!isDosen);
     const [secondsSpent, setSecondsSpent] = useState(doc?.totalDurasiDetik || 0);
 
-    // 1. Load the PDF document if server-side images are not present
+    // When PDF finishes loading with actual totalPages, restore page if valid
     useEffect(() => {
-        if (serverPages.length > 0 || !doc?.fileUrl) {
+        if (!initialPageSetRef.current && totalPages > 1 && backendPageIndex > 0) {
+            const targetPage = Math.min(backendPageIndex, totalPages - 1);
+            setCurrentPage(targetPage);
+            initialPageSetRef.current = true;
+        }
+    }, [totalPages, backendPageIndex]);
+
+    // 1. Load the PDF document
+    useEffect(() => {
+        if (!doc?.fileUrl) {
             setPdfLoading(false);
             return;
         }
@@ -183,11 +169,11 @@ export default function ReadingWorkspace({
                 activeLoadingTask.destroy();
             }
         };
-    }, [doc?.fileUrl, serverPages.length]);
+    }, [doc?.fileUrl]);
 
     // 2. Render the current page (and pre-render adjacent pages) to canvas dataURL
     useEffect(() => {
-        if (serverPages.length > 0 || !pdfDoc) return;
+        if (!pdfDoc) return;
 
         const pageNum = currentPage + 1;
         if (pageNum < 1 || pageNum > pdfDoc.numPages) return;
@@ -210,7 +196,6 @@ export default function ReadingWorkspace({
 
                 if (!context) {
                     setRenderingPage(false);
-                    
                     return;
                 }
 
@@ -236,7 +221,7 @@ export default function ReadingWorkspace({
         return () => {
             isCancelled = true;
         };
-    }, [pdfDoc, currentPage, pageCache, serverPages.length]);
+    }, [pdfDoc, currentPage, pageCache]);
 
     // Session restore dialog state
     const [pendingSession, setPendingSession] = useState<{
@@ -288,6 +273,10 @@ export default function ReadingWorkspace({
             setSlideDirection(page > currentPage ? 'right' : 'left');
             setIsAnimating(true);
             setCurrentPage(page);
+
+            if (contentRef.current) {
+                contentRef.current.scrollTop = 0;
+            }
 
             setTimeout(() => {
                 setIsAnimating(false);
@@ -376,7 +365,7 @@ export default function ReadingWorkspace({
             {
                 seconds: remainingSeconds,
                 percentage: pagePercent,
-                current_page: currentPage,
+                current_page: currentPage + 1,
             },
             {
                 onSuccess: () => {
@@ -408,7 +397,7 @@ export default function ReadingWorkspace({
                     {
                         seconds: secondsToSend,
                         percentage: Math.min(100, Math.max(0, pagePercent)),
-                        current_page: currentPageRef.current,
+                        current_page: currentPageRef.current + 1,
                     },
                     {
                         preserveScroll: true,
@@ -621,7 +610,7 @@ export default function ReadingWorkspace({
                                     className={`flex items-center justify-center transition-all duration-300 ease-in-out ${isAnimating ? (slideDirection === 'right' ? 'translate-x-4 opacity-0' : '-translate-x-4 opacity-0') : 'translate-x-0 opacity-100'}`}
                                 >
                                     {(() => {
-                                        const currentImageSrc = serverPages.length > 0 ? serverPages[currentPage] : pageCache[currentPage];
+                                        const currentImageSrc = pageCache[currentPage];
 
                                         if (pdfLoading || (renderingPage && !currentImageSrc)) {
                                             return (

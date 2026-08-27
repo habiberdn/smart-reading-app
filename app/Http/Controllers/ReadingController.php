@@ -82,28 +82,16 @@ class ReadingController extends Controller
             }
         }
 
-        // Only fetch the content column to extract image URLs, then immediately
-        // discard the raw text. This avoids keeping the full longText in memory
-        // which can cause OOM/503 on shared hosting with tight PHP limits.
-        $rawContent = $assignment->getRawOriginal('content') ?? $assignment->getOriginal('content') ?? '';
-        $rawContent = @iconv('UTF-8', 'UTF-8//IGNORE//TRANSLIT', $rawContent) ?: $rawContent;
-
-        // The frontend only uses [IMG:url] tags — extract just those
-        preg_match_all('/\[IMG:([^\]]+)\]/', $rawContent, $matches);
-        $imageUrls = $matches[1] ?? [];
-        unset($rawContent, $matches); // free memory immediately
-
-        // Rebuild a minimal content string with just the image tags
-        $minimalContent = implode("\n\n", array_map(fn ($url) => "[IMG:{$url}]", $imageUrls));
-
         // Ambil halaman terakhir yang dibaca oleh mahasiswa (jika ada)
-        $halamanSekarang = 0;
+        $halamanSekarang = 1;
         $totalDurasiDetik = 0;
         if ($isMahasiswa) {
             $progress = ReadingProgress::where('assignment_id', $assignment->id)
                 ->where('mahasiswa_id', Auth::id())
                 ->first();
-            $halamanSekarang = $progress->halaman_sekarang ?? 0;
+            if ($progress && $progress->halaman_sekarang) {
+                $halamanSekarang = max(1, (int) $progress->halaman_sekarang);
+            }
             $totalDurasiDetik = $progress->total_durasi_detik ?? 0;
         }
 
@@ -122,7 +110,7 @@ class ReadingController extends Controller
                 'average_sentence_length' => $assignment->average_sentence_length ?? 0.0,
                 'technical_word_count'    => $assignment->technical_word_count ?? 0,
             ],
-            'content'         => $minimalContent,
+            'content'         => '',
         ];
 
         return inertia('dosen/classroom/reading_workspace', [
