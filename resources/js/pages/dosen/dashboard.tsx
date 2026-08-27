@@ -7,6 +7,7 @@ import {
     GraduationCap,
     Copy,
     Check,
+    Loader2,
 } from 'lucide-react';
 import { useState } from 'react';
 import AssignmentCard from '@/components/classroom/assignment-card';
@@ -80,6 +81,7 @@ export default function Dashboard({
     const [isOpen, setOpen] = useState(false);
     const [step, setStep] = useState<1 | 2>(1);
     const [isCopied, setIsCopied] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     const [classForm, setClassForm] =
         useState<ClassFormState>(initialFormState);
@@ -95,9 +97,11 @@ export default function Dashboard({
     const handleCreateClass = (e: React.FormEvent) => {
         e.preventDefault();
 
-        if (!classForm.name.trim()) {
+        if (!classForm.name.trim() || isSubmitting) {
             return;
         }
+
+        setIsSubmitting(true);
 
         const generatedCode = Math.random()
             .toString(36)
@@ -114,6 +118,7 @@ export default function Dashboard({
             },
             {
                 onSuccess: () => {
+                    setIsSubmitting(false);
                     setClassForm((prev) => ({
                         ...prev,
                         code: generatedCode,
@@ -121,6 +126,7 @@ export default function Dashboard({
                     setStep(2);
                 },
                 onError: (err) => {
+                    setIsSubmitting(false);
                     alert(
                         'Gagal membuat kelas: ' + Object.values(err).join(', '),
                     );
@@ -130,11 +136,12 @@ export default function Dashboard({
     };
 
     const handleCloseModal = () => {
+        if (isSubmitting) return;
         setOpen(false);
         setTimeout(() => {
             setStep(1);
             setClassForm(initialFormState);
-
+            setIsSubmitting(false);
         }, 300);
     };
 
@@ -278,6 +285,7 @@ export default function Dashboard({
                                         placeholder="Contoh: Pemrograman Web Tingkat Lanjut"
                                         value={classForm.name}
                                         onChange={handleInputChange}
+                                        disabled={isSubmitting}
                                         required
                                     />
                                 </div>
@@ -291,6 +299,7 @@ export default function Dashboard({
                                         min={1}
                                         max={14}
                                         onChange={handleInputChange}
+                                        disabled={isSubmitting}
                                         required
                                     />
                                 </div>
@@ -303,6 +312,7 @@ export default function Dashboard({
                                         placeholder="Contoh: Kelas Reguler Ruang A.3"
                                         value={classForm.description}
                                         onChange={handleInputChange}
+                                        disabled={isSubmitting}
                                     />
                                 </div>
                             </div>
@@ -311,10 +321,20 @@ export default function Dashboard({
                                     type="button"
                                     variant="outline"
                                     onClick={handleCloseModal}
+                                    disabled={isSubmitting}
                                 >
                                     Batal
                                 </Button>
-                                <Button type="submit">Buat & Gali Kode</Button>
+                                <Button type="submit" disabled={isSubmitting}>
+                                    {isSubmitting ? (
+                                        <>
+                                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                            Membuat Kelas...
+                                        </>
+                                    ) : (
+                                        'Buat & Gali Kode'
+                                    )}
+                                </Button>
                             </DialogFooter>
                         </form>
                     ) : (
