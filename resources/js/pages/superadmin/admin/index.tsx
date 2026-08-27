@@ -51,6 +51,7 @@ export default function KelolaAdmin({ adminList = [] }: Props) {
         name: '',
         username: '',
         password: '',
+        password_confirmation: '',
         kampus: '',
     });
 
@@ -58,6 +59,7 @@ export default function KelolaAdmin({ adminList = [] }: Props) {
         name: '',
         username: '',
         password: '',
+        password_confirmation: '',
         kampus: '',
     });
 
@@ -81,6 +83,7 @@ export default function KelolaAdmin({ adminList = [] }: Props) {
             name: admin.name,
             username: admin.username,
             password: '',
+            password_confirmation: '',
             kampus: admin.kampus ?? '',
         });
         editForm.clearErrors();
@@ -299,6 +302,20 @@ export default function KelolaAdmin({ adminList = [] }: Props) {
                                 )}
                             </div>
                             <div className="grid gap-2">
+                                <Label htmlFor="create-password-confirmation">Konfirmasi Password</Label>
+                                <Input
+                                    id="create-password-confirmation"
+                                    type="password"
+                                    placeholder="Ulangi password"
+                                    value={createForm.data.password_confirmation}
+                                    onChange={(e) => createForm.setData('password_confirmation', e.target.value)}
+                                    required
+                                />
+                                {createForm.errors.password_confirmation && (
+                                    <span className="text-xs text-destructive">{createForm.errors.password_confirmation}</span>
+                                )}
+                            </div>
+                            <div className="grid gap-2">
                                 <Label htmlFor="create-kampus">Kampus (Institusi)</Label>
                                 <Input
                                     id="create-kampus"
@@ -374,6 +391,22 @@ export default function KelolaAdmin({ adminList = [] }: Props) {
                                     <span className="text-xs text-destructive">{editForm.errors.password}</span>
                                 )}
                             </div>
+                            {editForm.data.password && (
+                                <div className="grid gap-2">
+                                    <Label htmlFor="edit-password-confirmation">Konfirmasi Password Baru</Label>
+                                    <Input
+                                        id="edit-password-confirmation"
+                                        type="password"
+                                        placeholder="Ulangi password baru"
+                                        value={editForm.data.password_confirmation}
+                                        onChange={(e) => editForm.setData('password_confirmation', e.target.value)}
+                                        required
+                                    />
+                                    {editForm.errors.password_confirmation && (
+                                        <span className="text-xs text-destructive">{editForm.errors.password_confirmation}</span>
+                                    )}
+                                </div>
+                            )}
                             <div className="grid gap-2">
                                 <Label htmlFor="edit-kampus">Kampus (Institusi)</Label>
                                 <Input

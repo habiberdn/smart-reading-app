@@ -26,7 +26,7 @@ class SuperadminAdminController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'username' => 'required|string|max:255|unique:users,username',
-            'password' => 'required|string|min:8',
+            'password' => 'required|string|min:8|confirmed',
             'kampus' => 'required|string|max:255',
         ]);
 
@@ -50,7 +50,7 @@ class SuperadminAdminController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'username' => 'required|string|max:255|unique:users,username,' . $user->id,
-            'password' => 'nullable|string|min:8',
+            'password' => 'nullable|string|min:8|confirmed',
             'kampus' => 'required|string|max:255',
         ]);
 
