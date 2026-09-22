@@ -99,7 +99,7 @@ class ReadingController extends Controller
             'id'              => $assignment->id,
             'title'           => $assignment->judul,
             'fileName'        => $assignment->file_path ? basename($assignment->file_path) : 'Tidak ada lampiran',
-            'fileUrl'         => $assignment->file_path ? route('reading.file', $assignment->id) : null,
+            'fileUrl'         => $assignment->file_path ? route('reading.file', $assignment->id, false) : null,
             'difficultyScore' => $assignment->difficulty_score ?? 50,
             'totalHalaman'    => $assignment->total_halaman ?? 1,
             'halamanSekarang' => $halamanSekarang,
@@ -110,7 +110,7 @@ class ReadingController extends Controller
                 'average_sentence_length' => $assignment->average_sentence_length ?? 0.0,
                 'technical_word_count'    => $assignment->technical_word_count ?? 0,
             ],
-            'content'         => '',
+            'content'         => $assignment->content ? (@iconv('UTF-8', 'UTF-8//IGNORE', $assignment->content) ?: $assignment->content) : '',
         ];
 
         return inertia('dosen/classroom/reading_workspace', [

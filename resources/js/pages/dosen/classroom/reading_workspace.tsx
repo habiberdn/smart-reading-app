@@ -16,12 +16,14 @@ import {
     X,
     Loader2,
 } from 'lucide-react';
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import * as pdfjsLib from 'pdfjs-dist';
-import pdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
+import { useState, useEffect, useMemo, useCallback, useRef, Component, type ReactNode } from 'react';
+import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
+import pdfWorker from 'pdfjs-dist/legacy/build/pdf.worker.min.mjs?url';
 import { Button } from '@/components/ui/button';
 
-pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
+if (pdfjsLib.GlobalWorkerOptions) {
+    pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
+}
 import {
     Card,
     CardContent,
@@ -74,13 +76,50 @@ interface ReadingWorkspaceProps {
     document?: DocumentData;
 }
 
-export default function ReadingWorkspace({
+/**
+ * Membagi teks konten menjadi potongan halaman yang proporsional sesuai total halaman dokumen.
+ */
+function splitContentByPageCount(content: string, pageCount: number): string[] {
+    if (!content || !content.trim()) return [];
+    const cleanContent = content.replace(/\[IMG:[^\]]+\]/g, '').trim();
+    if (!cleanContent) return [];
+    const paragraphs = cleanContent.split(/\n\s*\n/).filter((p) => p.trim().length > 0);
+    if (paragraphs.length === 0 || pageCount <= 1) return [cleanContent];
+
+    const totalWords = paragraphs.reduce((acc, p) => acc + p.split(/\s+/).length, 0);
+    const wordsPerPage = Math.max(50, Math.ceil(totalWords / Math.max(1, pageCount)));
+    const pages: string[] = [];
+    let currentParas: string[] = [];
+    let currentWords = 0;
+
+    for (let i = 0; i < paragraphs.length; i++) {
+        const para = paragraphs[i];
+        const paraWords = para.split(/\s+/).length;
+        if (
+            pages.length < pageCount - 1 &&
+            currentWords > 0 &&
+            currentWords + paraWords > wordsPerPage
+        ) {
+            pages.push(currentParas.join('\n\n'));
+            currentParas = [para];
+            currentWords = paraWords;
+        } else {
+            currentParas.push(para);
+            currentWords += paraWords;
+        }
+    }
+    if (currentParas.length > 0) pages.push(currentParas.join('\n\n'));
+    while (pages.length < pageCount && pages.length > 0) pages.push('');
+    return pages;
+}
+
+function ReadingWorkspaceInner({
     auth,
     document: backendDocument,
 }: ReadingWorkspaceProps) {
     // TypeScript otomatis tahu bahwa setelah baris ini, backendDocument pasti ada (aman)
     const doc = backendDocument;
-    const isDosen = auth.user.role === 'dosen';
+    const isDosen = auth?.user?.role === 'dosen';
 
     // Client-side PDF rendering state (PDF.js)
     const [pdfDoc, setPdfDoc] = useState<pdfjsLib.PDFDocumentProxy | null>(null);
@@ -96,6 +135,16 @@ export default function ReadingWorkspace({
         if (clientTotalPages > 0) return clientTotalPages;
         return Math.max(doc?.totalHalaman || 1, 1);
     }, [pdfDoc, clientTotalPages, doc?.totalHalaman]);
+
+    // Text content pages derived from extracted text
+    const textPages = useMemo(() => {
+        return splitContentByPageCount(doc?.content || '', totalPages);
+    }, [doc?.content, totalPages]);
+
+    // View mode: 'pdf' (visual PDF canvas) or 'text' (extracted clean typography)
+    const [viewMode, setViewMode] = useState<'pdf' | 'text'>(() => {
+        return !doc?.fileUrl && doc?.content ? 'text' : 'pdf';
+    });
 
     // Backend sends 1-based halamanSekarang (default 1). Convert to 0-based index.
     const backendPageIndex = doc?.halamanSekarang ? Math.max(0, doc.halamanSekarang - 1) : 0;
@@ -170,6 +219,13 @@ export default function ReadingWorkspace({
             }
         };
     }, [doc?.fileUrl]);
+
+    // Fallback otomatis ke mode teks jika PDF gagal dimuat dan konten teks tersedia
+    useEffect(() => {
+        if (pdfError && textPages.length > 0) {
+            setViewMode('text');
+        }
+    }, [pdfError, textPages.length]);
 
     // 2. Render the current page (and pre-render adjacent pages) to canvas dataURL
     useEffect(() => {
@@ -552,7 +608,25 @@ export default function ReadingWorkspace({
                 </div>
 
                 {/* Tracker Panel Controls */}
-                <div className="flex items-center gap-3 self-end sm:self-auto">
+                <div className="flex flex-wrap items-center gap-3 self-end sm:self-auto">
+                    {textPages.length > 0 && !!doc?.fileUrl && (
+                        <div className="flex items-center rounded-lg border bg-muted/60 p-0.5 text-xs">
+                            <button
+                                type="button"
+                                onClick={() => setViewMode('pdf')}
+                                className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 font-medium transition-colors ${viewMode === 'pdf' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+                            >
+                                <FileText className="h-3.5 w-3.5" /> Mode PDF
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setViewMode('text')}
+                                className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 font-medium transition-colors ${viewMode === 'text' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+                            >
+                                <BookOpen className="h-3.5 w-3.5" /> Mode Teks
+                            </button>
+                        </div>
+                    )}
                     {isDosen ? (
                         <div className="flex items-center gap-2 rounded-full border border-amber-500/20 bg-amber-500/10 px-4 py-1.5 text-xs font-medium text-amber-700">
                             <UserCheck className="h-4 w-4" /> Tracker
@@ -610,6 +684,58 @@ export default function ReadingWorkspace({
                                     className={`flex items-center justify-center transition-all duration-300 ease-in-out ${isAnimating ? (slideDirection === 'right' ? 'translate-x-4 opacity-0' : '-translate-x-4 opacity-0') : 'translate-x-0 opacity-100'}`}
                                 >
                                     {(() => {
+                                        // Mode Teks (Reader Mode)
+                                        if (viewMode === 'text') {
+                                            const pageText = textPages[currentPage] || '';
+                                            if (!pageText.trim()) {
+                                                return (
+                                                    <div className="flex flex-col items-center gap-3 py-20 text-muted-foreground text-center">
+                                                        <AlertCircle className="h-10 w-10" />
+                                                        <p className="text-sm">Tidak ada teks yang dapat ditampilkan pada halaman ini.</p>
+                                                        {doc?.fileUrl && (
+                                                            <Button
+                                                                variant="outline"
+                                                                size="sm"
+                                                                onClick={() => setViewMode('pdf')}
+                                                                className="mt-2"
+                                                            >
+                                                                Buka Mode PDF
+                                                            </Button>
+                                                        )}
+                                                    </div>
+                                                );
+                                            }
+
+                                            return (
+                                                <div className="w-full max-w-3xl space-y-4 py-2 px-1 text-left">
+                                                    {pageText.split(/\n\s*\n/).map((para, pIdx) => {
+                                                        const cleanPara = para.trim();
+                                                        if (!cleanPara) return null;
+
+                                                        const isHeading = cleanPara.length < 90 && (
+                                                            /^(BAB|CHAPTER|Bab|Chapter|\d+\.|\b(ABSTRACT|ABSTRAK|PENDAHULUAN|METODE|HASIL|KESIMPULAN|PEMBAHASAN|REFERENCES|DAFTAR PUSTAKA)\b)/i.test(cleanPara) ||
+                                                            (cleanPara === cleanPara.toUpperCase() && /[A-Z]/.test(cleanPara) && !cleanPara.endsWith('.'))
+                                                        );
+
+                                                        if (isHeading) {
+                                                            return (
+                                                                <h3 key={pIdx} className="pt-3 text-base font-bold text-foreground sm:text-lg">
+                                                                    {cleanPara}
+                                                                </h3>
+                                                            );
+                                                        }
+
+                                                        return (
+                                                            <p key={pIdx} className="text-sm sm:text-base leading-relaxed text-foreground/90 text-justify">
+                                                                {cleanPara}
+                                                            </p>
+                                                        );
+                                                    })}
+                                                </div>
+                                            );
+                                        }
+
+                                        // Mode PDF (Visual Canvas)
                                         const currentImageSrc = pageCache[currentPage];
 
                                         if (pdfLoading || (renderingPage && !currentImageSrc)) {
@@ -617,6 +743,16 @@ export default function ReadingWorkspace({
                                                 <div className="flex flex-col items-center justify-center py-28 text-muted-foreground gap-3">
                                                     <Loader2 className="h-8 w-8 animate-spin text-primary" />
                                                     <p className="text-sm font-medium">Memuat halaman {currentPage + 1}...</p>
+                                                    {textPages.length > 0 && (
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            onClick={() => setViewMode('text')}
+                                                            className="text-xs text-muted-foreground hover:text-foreground"
+                                                        >
+                                                            Beralih ke Mode Teks sementara memuat
+                                                        </Button>
+                                                    )}
                                                 </div>
                                             );
                                         }
@@ -647,6 +783,16 @@ export default function ReadingWorkspace({
                                                 <div className="flex flex-col items-center gap-3 py-20 text-muted-foreground text-center">
                                                     <AlertCircle className="h-10 w-10 text-destructive" />
                                                     <p className="text-sm font-medium text-destructive">{pdfError}</p>
+                                                    {textPages.length > 0 && (
+                                                        <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            onClick={() => setViewMode('text')}
+                                                            className="mt-2 gap-2"
+                                                        >
+                                                            <BookOpen className="h-4 w-4" /> Buka Mode Teks
+                                                        </Button>
+                                                    )}
                                                     {doc?.fileUrl && (
                                                         <a
                                                             href={doc.fileUrl}
@@ -665,6 +811,16 @@ export default function ReadingWorkspace({
                                             <div className="flex flex-col items-center gap-3 py-20 text-muted-foreground text-center">
                                                 <AlertCircle className="h-10 w-10" />
                                                 <p className="text-sm">Tidak ada halaman yang dapat ditampilkan untuk dokumen ini.</p>
+                                                {textPages.length > 0 && (
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() => setViewMode('text')}
+                                                        className="mt-2 gap-2"
+                                                    >
+                                                        <BookOpen className="h-4 w-4" /> Buka Mode Teks
+                                                    </Button>
+                                                )}
                                                 {doc?.fileUrl && (
                                                     <a
                                                         href={doc.fileUrl}
@@ -919,7 +1075,7 @@ export default function ReadingWorkspace({
                                         Total Kata
                                     </p>
                                     <p className="font-mono text-sm font-bold text-foreground">
-                                        {doc.metrics.word_count}
+                                        {doc.metrics?.word_count ?? 0}
                                     </p>
                                 </div>
                                 <div className="rounded-lg bg-muted/40 p-2.5">
@@ -927,7 +1083,7 @@ export default function ReadingWorkspace({
                                         Jumlah Kalimat
                                     </p>
                                     <p className="font-mono text-sm font-bold text-foreground">
-                                        {doc.metrics.sentence_count}
+                                        {doc.metrics?.sentence_count ?? 0}
                                     </p>
                                 </div>
                                 <div className="rounded-lg bg-muted/40 p-2.5">
@@ -935,7 +1091,7 @@ export default function ReadingWorkspace({
                                         Rerata Kalimat
                                     </p>
                                     <p className="font-mono text-sm font-bold text-foreground">
-                                        {doc.metrics.average_sentence_length}{' '}
+                                        {doc.metrics?.average_sentence_length ?? 0}{' '}
                                         kata
                                     </p>
                                 </div>
@@ -944,7 +1100,7 @@ export default function ReadingWorkspace({
                                         Kata Teknikal
                                     </p>
                                     <p className="font-mono text-sm font-bold text-foreground">
-                                        {doc.metrics.technical_word_count}
+                                        {doc.metrics?.technical_word_count ?? 0}
                                     </p>
                                 </div>
                             </div>
@@ -1094,5 +1250,94 @@ export default function ReadingWorkspace({
                 </div>
             )}
         </>
+    );
+}
+
+interface ErrorBoundaryProps {
+    children: ReactNode;
+    doc?: DocumentData;
+}
+
+interface ErrorBoundaryState {
+    hasError: boolean;
+    error: Error | null;
+}
+
+class ReadingWorkspaceErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+    constructor(props: ErrorBoundaryProps) {
+        super(props);
+        this.state = { hasError: false, error: null };
+    }
+
+    static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+        return { hasError: true, error };
+    }
+
+    componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+        console.error('Reading Workspace Error:', error, errorInfo);
+    }
+
+    render() {
+        if (this.state.hasError) {
+            const content = this.props.doc?.content?.replace(/\[IMG:[^\]]+\]/g, '').trim();
+            return (
+                <div className="min-h-screen bg-background p-6 text-foreground">
+                    <div className="mx-auto max-w-3xl space-y-6">
+                        <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-6">
+                            <div className="flex items-center gap-3">
+                                <AlertCircle className="h-6 w-6 text-destructive shrink-0" />
+                                <div>
+                                    <h2 className="text-base font-bold text-destructive">
+                                        Terjadi Kendala Memuat Tampilan Visual
+                                    </h2>
+                                    <p className="mt-1 text-xs text-muted-foreground">
+                                        {this.state.error?.message || 'Terjadi kesalahan sistem saat memproses dokumen.'}
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="mt-4 flex flex-wrap gap-2">
+                                <Button
+                                    size="sm"
+                                    onClick={() => window.location.reload()}
+                                    className="text-xs"
+                                >
+                                    Muat Ulang Halaman
+                                </Button>
+                                <Link href="/mahasiswa/dashboard">
+                                    <Button size="sm" variant="outline" className="text-xs">
+                                        Kembali ke Dashboard
+                                    </Button>
+                                </Link>
+                            </div>
+                        </div>
+
+                        {content && (
+                            <div className="rounded-xl border bg-card p-6 shadow-sm">
+                                <h3 className="mb-4 text-base font-bold border-b pb-2">
+                                    Teks Dokumen Bacaan
+                                </h3>
+                                <div className="space-y-4">
+                                    {content.split(/\n\s*\n/).map((para, i) => (
+                                        <p key={i} className="text-sm leading-relaxed text-foreground/90 text-justify">
+                                            {para}
+                                        </p>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        }
+
+        return this.props.children;
+    }
+}
+
+export default function ReadingWorkspace(props: ReadingWorkspaceProps) {
+    return (
+        <ReadingWorkspaceErrorBoundary doc={props.document}>
+            <ReadingWorkspaceInner {...props} />
+        </ReadingWorkspaceErrorBoundary>
     );
 }
