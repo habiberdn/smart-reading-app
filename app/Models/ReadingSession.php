@@ -17,6 +17,7 @@ class ReadingSession extends Model
         'ended_at',
         'durasi_detik',
         'halaman_terakhir',
+        'is_valid',
     ];
 
     protected function casts(): array
@@ -24,6 +25,7 @@ class ReadingSession extends Model
         return [
             'started_at' => 'datetime',
             'ended_at'   => 'datetime',
+            'is_valid'   => 'boolean',
         ];
     }
 
@@ -33,7 +35,6 @@ class ReadingSession extends Model
             // Hanya proses jika sesi baru saja diselesaikan
             if ($session->isDirty('ended_at') && $session->ended_at !== null) {
                 $session->syncProgress();
-                $session->syncDailyLog();
             }
         });
     }

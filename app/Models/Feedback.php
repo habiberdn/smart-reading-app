@@ -9,20 +9,22 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class Feedback extends Model
 {
     protected $fillable = [
-           'mahasiswa_id',
-           'assignment_id',
-           'type',
-           'trigger_rule',
-           'pesan',
-           'read_at',
-       ];
+        'mahasiswa_id',
+        'assignment_id',
+        'type',
+        'trigger_rule',
+        'pesan',
+        'tanggal',
+        'read_at',
+    ];
 
-       protected function casts(): array
-       {
-           return [
-               'read_at' => 'datetime',
-           ];
-       }
+    protected function casts(): array
+    {
+        return [
+            'tanggal' => 'date',
+            'read_at' => 'datetime',
+        ];
+    }
 
        public function mahasiswa(): BelongsTo
        {

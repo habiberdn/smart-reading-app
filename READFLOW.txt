@@ -61,3 +61,16 @@ Budi
 
 Least Active Student
 Andi
+
+------------------------------------------------
+1. Fitur mencatat jumlah sesi membaca yang dilakukan oleh setiap pengguna SEKALIGUS fitur streak.
+Solusi : 
+-  Tetapkan ambang batas minimal (threshold), misalnya: baru dicatat sebagai sesi valid jika durasi aktif >= 1 menit 
+    atau membaca minimal 1 halaman/paragraf.
+2. Gamification
+-  kuis pilihan ganda berbasis teks yang relevan dengan bacaan pengguna.
+3. menilai ringkasan bacaan yang ditulis pengguna menggunakan analisis berbasis AI.
+- Kemungkinan menggunakan embedded AI
+4. Sistem mampu memberikan umpan balik secara langsung setelah pengguna menyelesaikan aktivitas penilaian.
+- hasil dari penilaian embedded AI (estimated confidence score)
+5. 

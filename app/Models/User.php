@@ -25,6 +25,9 @@ class User extends Authenticatable
         'nidn',
         'program_studi',
         'avatar',
+        'daily_target_minutes',
+        'weekly_target_minutes',
+        'target_type',
     ];
 
     protected $hidden = [
@@ -112,9 +115,15 @@ class User extends Authenticatable
     public function getCurrentStreakAttribute(): int
     {
         $logs = $this->readingDailyLogs()
+                     ->where(function ($query) {
+                         $query->where('jumlah_sesi', '>', 0)
+                               ->orWhere('total_durasi_detik', '>=', 60);
+                     })
                      ->orderByDesc('tanggal')
                      ->pluck('tanggal')
-                     ->map(fn($d) => \Carbon\Carbon::parse($d));
+                     ->map(fn($d) => \Carbon\Carbon::parse($d)->startOfDay())
+                     ->unique(fn($d) => $d->toDateString())
+                     ->values();
 
         if ($logs->isEmpty()) {
             return 0;
@@ -144,5 +153,44 @@ class User extends Authenticatable
     {
         $avg = $this->readingDailyLogs()->avg('total_durasi_detik') ?? 0;
         return round($avg / 60, 1);
+    }
+
+    /** Menit baca hari ini (dari reading_daily_logs) */
+    public function getTodayReadingMinutesAttribute(): float
+    {
+        $log = $this->readingDailyLogs()
+                    ->where('tanggal', now()->toDateString())
+                    ->first();
+        return $log ? round($log->total_durasi_detik / 60, 1) : 0.0;
+    }
+
+    /** Total menit baca minggu ini (Senin s/d hari ini) */
+    public function getWeekReadingMinutesAttribute(): float
+    {
+        $total = $this->readingDailyLogs()
+                      ->whereBetween('tanggal', [
+                          now()->startOfWeek()->toDateString(),
+                          now()->toDateString(),
+                      ])
+                      ->sum('total_durasi_detik');
+        return round($total / 60, 1);
+    }
+
+    /** Persentase pencapaian target harian (0–100+) */
+    public function getDailyAchievementPercentAttribute(): float
+    {
+        if ($this->daily_target_minutes <= 0) {
+            return 0.0;
+        }
+        return round(($this->today_reading_minutes / $this->daily_target_minutes) * 100, 1);
+    }
+
+    /** Persentase pencapaian target mingguan (0–100+) */
+    public function getWeeklyAchievementPercentAttribute(): float
+    {
+        if ($this->weekly_target_minutes <= 0) {
+            return 0.0;
+        }
+        return round(($this->week_reading_minutes / $this->weekly_target_minutes) * 100, 1);
     }
 }

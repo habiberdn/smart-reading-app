@@ -45,6 +45,15 @@ class HandleInertiaRequests extends Middleware
             'flash' => [
                 'invitationUrl' => fn () => $request->session()->get('invitationUrl'),
             ],
+            'reminders' => fn () => $request->user()?->role === 'mahasiswa'
+                ? \App\Models\Feedback::where('mahasiswa_id', $request->user()->id)
+                    ->unread()
+                    ->where('type', 'reminder')
+                    ->latest()
+                    ->limit(10)
+                    ->get(['id', 'assignment_id', 'type', 'trigger_rule', 'pesan', 'created_at'])
+                    ->toArray()
+                : [],
         ];
     }
 }

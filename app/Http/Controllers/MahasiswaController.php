@@ -64,16 +64,34 @@ class MahasiswaController extends Controller
 
         $recommendations = $recommendationService->recommendFor($user);
 
+        $totalSessionsCount = ReadingSession::where('mahasiswa_id', $user->id)
+            ->where('is_valid', true)
+            ->count();
+        $currentStreak = $user->current_streak;
+
         return inertia('mahasiswa/dashboard', [
-            'name'              => $user->name,
-            'classrooms'        => $classrooms,
-            'assignments'       => \App\Http\Resources\ReadingAssignmentResource::collection($assignments)->resolve(),
-            'totalReadingTime'  => $totalReadingTimeStr,
-            'booksCount'        => $booksCount,
-            'articlesCount'     => $articlesCount,
-            'papersCount'       => $papersCount,
-            'avgDifficulty'     => round($avgDiff),
-            'recommendations'   => $recommendations,
+            'name'               => $user->name,
+            'classrooms'         => $classrooms,
+            'assignments'        => \App\Http\Resources\ReadingAssignmentResource::collection($assignments)->resolve(),
+            'totalReadingTime'   => $totalReadingTimeStr,
+            'booksCount'         => $booksCount,
+            'articlesCount'      => $articlesCount,
+            'papersCount'        => $papersCount,
+            'avgDifficulty'      => round($avgDiff),
+            'totalSessionsCount' => $totalSessionsCount,
+            'currentStreak'      => $currentStreak,
+            'recommendations'    => $recommendations,
+            'readingTarget'      => [
+                'daily_target_minutes'  => (int) $user->daily_target_minutes,
+                'weekly_target_minutes' => (int) $user->weekly_target_minutes,
+                'target_type'           => $user->target_type ?? 'daily',
+                'today_minutes'         => $user->today_reading_minutes,
+                'week_minutes'          => $user->week_reading_minutes,
+                'daily_percent'         => $user->daily_achievement_percent,
+                'weekly_percent'        => $user->weekly_achievement_percent,
+                'daily_achieved'        => $user->daily_target_minutes > 0 && $user->daily_achievement_percent >= 100,
+                'weekly_achieved'       => $user->weekly_target_minutes > 0 && $user->weekly_achievement_percent >= 100,
+            ],
         ]);
     }
 
@@ -131,9 +149,13 @@ class MahasiswaController extends Controller
         }
 
         \Illuminate\Support\Facades\DB::transaction(function () use ($request, $assignment) {
+            $userId = Auth::id();
+            $today = now()->toDateString();
+
+            // 1. Update/create ReadingProgress
             $progress = ReadingProgress::firstOrCreate([
                 'assignment_id' => $assignment->id,
-                'mahasiswa_id'  => Auth::id(),
+                'mahasiswa_id'  => $userId,
             ], [
                 'status'             => 'in_progress',
                 'halaman_sekarang'   => 1,
@@ -143,7 +165,7 @@ class MahasiswaController extends Controller
             ]);
 
             $progress->total_durasi_detik += $request->seconds;
-            $progress->persentase = max($progress->persentase, $request->percentage);
+            $progress->persentase = max((float) $progress->persentase, (float) $request->percentage);
 
             if ($request->has('current_page')) {
                 $progress->halaman_sekarang = $request->current_page;
@@ -162,25 +184,60 @@ class MahasiswaController extends Controller
             $progress->last_read_at = now();
             $progress->save();
 
-            $session = ReadingSession::firstOrNew([
-                'assignment_id' => $assignment->id,
-                'mahasiswa_id'  => Auth::id(),
-                'ended_at'      => null,
-            ], [
-                'started_at' => $progress->first_opened_at ?? now(),
-            ]);
-            $session->durasi_detik = ($session->durasi_detik ?? 0) + $request->seconds;
-            $session->halaman_terakhir = $request->current_page ?? $session->halaman_terakhir;
-            $session->save();
+            // 2. Manage ReadingSession
+            // Cari sesi aktif yang belum ditutup
+            $session = ReadingSession::where('assignment_id', $assignment->id)
+                ->where('mahasiswa_id', $userId)
+                ->whereNull('ended_at')
+                ->latest('started_at')
+                ->first();
 
-            $today = now()->format('Y-m-d');
+            // Jika sesi sudah stale (>30 menit tidak ada ping) atau beda hari, tutup sesi lama
+            if ($session) {
+                $sessionDate = $session->started_at ? $session->started_at->toDateString() : null;
+                $isStale = $session->updated_at && $session->updated_at->lt(now()->subMinutes(30));
+                $isDifferentDay = $sessionDate !== $today;
+
+                if ($isStale || $isDifferentDay) {
+                    $session->ended_at = $session->updated_at ?? now();
+                    $session->save();
+                    $session = null;
+                }
+            }
+
+            if (!$session) {
+                $session = new ReadingSession([
+                    'assignment_id'    => $assignment->id,
+                    'mahasiswa_id'     => $userId,
+                    'started_at'       => now(),
+                    'durasi_detik'     => 0,
+                    'halaman_terakhir' => $request->current_page ?? 1,
+                    'is_valid'         => false,
+                ]);
+            }
+
+            $session->durasi_detik += $request->seconds;
+            if ($request->has('current_page')) {
+                $session->halaman_terakhir = $request->current_page;
+            }
+
+            // 3. Log Harian & Validasi Sesi (threshold >= 60 detik)
             $log = ReadingDailyLog::firstOrCreate([
-                'mahasiswa_id' => Auth::id(),
+                'mahasiswa_id' => $userId,
                 'tanggal'      => $today,
             ], [
                 'total_durasi_detik' => 0,
+                'jumlah_sesi'        => 0,
             ]);
+
             $log->total_durasi_detik += $request->seconds;
+
+            if ($session->durasi_detik >= 60 && !$session->is_valid) {
+                $session->is_valid = true;
+                $log->jumlah_sesi += 1;
+            }
+
+            $session->save();
             $log->save();
         });
 
@@ -201,9 +258,10 @@ class MahasiswaController extends Controller
             abort(403, 'Anda tidak memiliki akses ke assignment ini.');
         }
 
+        $userId = Auth::id();
         $progress = ReadingProgress::firstOrCreate([
             'assignment_id' => $assignment_id,
-            'mahasiswa_id'  => Auth::id(),
+            'mahasiswa_id'  => $userId,
         ], [
             'status'             => 'in_progress',
             'halaman_sekarang'   => $request->current_page ?? 1,
@@ -212,46 +270,60 @@ class MahasiswaController extends Controller
             'first_opened_at'    => now(),
         ]);
 
-        \Illuminate\Support\Facades\DB::transaction(function () use ($request, $progress, $assignment_id) {
+        \Illuminate\Support\Facades\DB::transaction(function () use ($request, $progress, $assignment_id, $userId) {
+            $today = now()->toDateString();
+
             $progress->status = 'completed';
             $progress->persentase = 100.00;
             $progress->completed_at = now();
-            $progress->halaman_sekarang = $request->current_page ?? $progress->halaman_sekarang;
-            
+            if ($request->filled('current_page')) {
+                $progress->halaman_sekarang = $request->current_page;
+            }
+
+            $session = ReadingSession::where('assignment_id', $assignment_id)
+                ->where('mahasiswa_id', $userId)
+                ->whereNull('ended_at')
+                ->latest('started_at')
+                ->first();
+
+            $log = ReadingDailyLog::firstOrCreate([
+                'mahasiswa_id' => $userId,
+                'tanggal'      => $today,
+            ], [
+                'total_durasi_detik' => 0,
+                'jumlah_sesi'        => 0,
+            ]);
+
             if ($request->filled('seconds') && $request->seconds > 0) {
                 $progress->total_durasi_detik += $request->seconds;
-                
-                $session = ReadingSession::firstOrNew([
-                    'assignment_id' => $assignment_id,
-                    'mahasiswa_id'  => Auth::id(),
-                    'ended_at'      => null,
-                ], [
-                    'started_at' => $progress->first_opened_at ?? now(),
-                ]);
-                $session->durasi_detik = ($session->durasi_detik ?? 0) + $request->seconds;
-                if ($request->has('current_page')) {
+                $log->total_durasi_detik += $request->seconds;
+
+                if (!$session) {
+                    $session = new ReadingSession([
+                        'assignment_id'    => $assignment_id,
+                        'mahasiswa_id'     => $userId,
+                        'started_at'       => now()->subSeconds($request->seconds),
+                        'durasi_detik'     => 0,
+                        'halaman_terakhir' => $request->current_page ?? 1,
+                        'is_valid'         => false,
+                    ]);
+                }
+                $session->durasi_detik += $request->seconds;
+            }
+
+            if ($session) {
+                if ($request->filled('current_page')) {
                     $session->halaman_terakhir = $request->current_page;
+                }
+                if ($session->durasi_detik >= 60 && !$session->is_valid) {
+                    $session->is_valid = true;
+                    $log->jumlah_sesi += 1;
                 }
                 $session->ended_at = now();
                 $session->save();
-
-                $today = now()->format('Y-m-d');
-                $log = ReadingDailyLog::firstOrCreate([
-                    'mahasiswa_id' => Auth::id(),
-                    'tanggal'      => $today,
-                ], [
-                    'total_durasi_detik' => 0,
-                ]);
-                $log->total_durasi_detik += $request->seconds;
-                $log->save();
-            } else {
-                // Tutup session aktif
-                ReadingSession::where('assignment_id', $assignment_id)
-                    ->where('mahasiswa_id', Auth::id())
-                    ->whereNull('ended_at')
-                    ->update(['ended_at' => now()]);
             }
 
+            $log->save();
             $progress->save();
         });
 

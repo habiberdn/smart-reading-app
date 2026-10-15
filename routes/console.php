@@ -40,3 +40,5 @@ Artisan::command('assignments:sync-pages', function () {
 
     $this->info("Selesai! {$count} tugas berhasil disinkronkan jumlah halamannya.");
 })->purpose('Sinkronkan jumlah total halaman PDF fisik dengan database');
+
+\Illuminate\Support\Facades\Schedule::command('reminders:generate')->hourly();

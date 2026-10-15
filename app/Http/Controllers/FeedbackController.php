@@ -3,63 +3,41 @@
 namespace App\Http\Controllers;
 
 use App\Models\Feedback;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
 class FeedbackController extends Controller
 {
     /**
-     * Display a listing of the resource.
+     * Tandai notifikasi / reminder tertentu sebagai telah dibaca.
      */
-    public function index()
+    public function markRead(Feedback $feedback): JsonResponse
     {
-        //
+        if ($feedback->mahasiswa_id !== Auth::id()) {
+            abort(403, 'Akses tidak diizinkan.');
+        }
+
+        $feedback->markAsRead();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Notifikasi ditandai telah dibaca.',
+        ]);
     }
 
     /**
-     * Show the form for creating a new resource.
+     * Tandai semua reminder milik mahasiswa saat ini sebagai telah dibaca.
      */
-    public function create()
+    public function markAllRead(): JsonResponse
     {
-        //
-    }
+        Feedback::where('mahasiswa_id', Auth::id())
+            ->unread()
+            ->update(['read_at' => now()]);
 
-    /**
-     * Store a newly created resource in storage.
-     */
-    public function store(Request $request)
-    {
-        //
-    }
-
-    /**
-     * Display the specified resource.
-     */
-    public function show(Feedback $feedback)
-    {
-        //
-    }
-
-    /**
-     * Show the form for editing the specified resource.
-     */
-    public function edit(Feedback $feedback)
-    {
-        //
-    }
-
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(Request $request, Feedback $feedback)
-    {
-        //
-    }
-
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(Feedback $feedback)
-    {
-        //
+        return response()->json([
+            'success' => true,
+            'message' => 'Semua notifikasi ditandai telah dibaca.',
+        ]);
     }
 }

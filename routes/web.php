@@ -6,10 +6,12 @@ use App\Http\Controllers\Admin\InvitationController;
 use App\Http\Controllers\AuthenticatedSessionController;
 use App\Http\Controllers\ClassroomController;
 use App\Http\Controllers\DosenController;
+use App\Http\Controllers\FeedbackController;
 use App\Http\Controllers\GoogleAuthController;
 use App\Http\Controllers\MahasiswaController;
 use App\Http\Controllers\ReadingAssignmentController;
 use App\Http\Controllers\ReadingController;
+use App\Http\Controllers\ReadingTargetController;
 use App\Http\Controllers\Superadmin\SuperadminAdminController;
 use App\Http\Controllers\Superadmin\SuperadminDashboardController;
 use Illuminate\Support\Facades\Auth;
@@ -64,6 +66,10 @@ Route::middleware(['auth', 'role:mahasiswa'])->prefix('mahasiswa')->name('mahasi
     Route::post('/read/{assignment_id}/finish', [MahasiswaController::class, 'finishReading'])->name('read.finish');
     Route::get('/classrooms', [MahasiswaController::class, 'classroomsList'])->name('classrooms');
     Route::get('/classrooms/{kode}', [ClassroomController::class, 'show'])->name('classrooms.show');
+    Route::get('/target', [ReadingTargetController::class, 'show'])->name('target.show');
+    Route::put('/target', [ReadingTargetController::class, 'update'])->name('target.update');
+    Route::put('/reminders/{feedback}/read', [FeedbackController::class, 'markRead'])->name('reminders.read');
+    Route::put('/reminders/read-all', [FeedbackController::class, 'markAllRead'])->name('reminders.read-all');
 });
 
 Route::get('/', function () {

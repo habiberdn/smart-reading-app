@@ -10,9 +10,14 @@ import {
     BookOpenCheck,
     FileText,
     Sparkles,
+    Flame,
+    Layers,
+    Target,
+    Trophy,
 } from 'lucide-react';
 import { useState } from 'react';
 import RecommendationCard from '@/components/mahasiswa/recommendation-card';
+import SetTargetDialog from '@/components/mahasiswa/set-target-dialog';
 import { Button } from '@/components/ui/button';
 import {
     Card,
@@ -24,7 +29,7 @@ import {
 } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import type { RecommendationType } from '@/types';
+import type { RecommendationType, ReadingTarget } from '@/types';
 
 interface ClassroomType {
     id: number;
@@ -70,7 +75,10 @@ interface Props {
     articlesCount: number;
     papersCount: number;
     avgDifficulty: number;
+    totalSessionsCount?: number;
+    currentStreak?: number;
     recommendations: RecommendationType[];
+    readingTarget?: ReadingTarget;
 }
 
 export default function MahasiswaDashboard({
@@ -82,7 +90,10 @@ export default function MahasiswaDashboard({
     articlesCount = 0,
     papersCount = 0,
     avgDifficulty = 0,
+    totalSessionsCount = 0,
+    currentStreak = 0,
     recommendations = [],
+    readingTarget,
 }: Props) {
     const { data, setData, post, processing, errors, reset } = useForm({
         kode_kelas: '',
@@ -149,11 +160,11 @@ export default function MahasiswaDashboard({
                 </div>
 
                 {/* Ringkasan Statistik Membaca (READFLOW.txt) */}
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+                <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7">
                     <Card className="border bg-card shadow-sm transition-shadow hover:shadow-md">
                         <CardHeader className="pb-2">
                             <CardTitle className="text-xs font-bold tracking-wider text-muted-foreground uppercase">
-                                Total Durasi Baca
+                                Total Durasi
                             </CardTitle>
                         </CardHeader>
                         <CardContent>
@@ -165,6 +176,50 @@ export default function MahasiswaDashboard({
                             <p className="mt-1 flex items-center gap-1 text-[10px] text-muted-foreground">
                                 <Clock className="h-3 w-3 text-primary" />{' '}
                                 Akumulasi aktif
+                            </p>
+                        </CardContent>
+                    </Card>
+
+                    <Card className="border bg-card shadow-sm transition-shadow hover:shadow-md">
+                        <CardHeader className="pb-2">
+                            <CardTitle className="text-xs font-bold tracking-wider text-muted-foreground uppercase">
+                                Sesi Membaca
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="flex items-baseline gap-2">
+                                <span className="text-2xl font-extrabold text-foreground">
+                                    {totalSessionsCount}
+                                </span>
+                                <span className="text-xs text-muted-foreground">
+                                    sesi
+                                </span>
+                            </div>
+                            <p className="mt-1 flex items-center gap-1 text-[10px] text-muted-foreground">
+                                <Layers className="h-3 w-3 text-indigo-500" />{' '}
+                                Sesi valid (&ge; 1m)
+                            </p>
+                        </CardContent>
+                    </Card>
+
+                    <Card className="border bg-card shadow-sm transition-shadow hover:shadow-md">
+                        <CardHeader className="pb-2">
+                            <CardTitle className="text-xs font-bold tracking-wider text-muted-foreground uppercase">
+                                Streak
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="flex items-baseline gap-2">
+                                <span className="text-2xl font-extrabold text-foreground">
+                                    {currentStreak}
+                                </span>
+                                <span className="text-xs text-muted-foreground">
+                                    hari
+                                </span>
+                            </div>
+                            <p className="mt-1 flex items-center gap-1 text-[10px] text-muted-foreground">
+                                <Flame className="h-3 w-3 text-orange-500" />{' '}
+                                Berturut-turut
                             </p>
                         </CardContent>
                     </Card>
@@ -248,6 +303,178 @@ export default function MahasiswaDashboard({
                         </CardContent>
                     </Card>
                 </div>
+
+                {/* Target Membaca Harian & Mingguan */}
+                {(() => {
+                    const hasDaily =
+                        (readingTarget?.target_type === 'daily' || readingTarget?.target_type === 'both') &&
+                        (readingTarget?.daily_target_minutes ?? 0) > 0;
+                    const hasWeekly =
+                        (readingTarget?.target_type === 'weekly' || readingTarget?.target_type === 'both') &&
+                        (readingTarget?.weekly_target_minutes ?? 0) > 0;
+                    const isConfigured = hasDaily || hasWeekly;
+
+                    return (
+                        <Card className="border bg-card shadow-sm">
+                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+                                <div className="space-y-1">
+                                    <div className="flex items-center gap-2">
+                                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                                            <Target className="h-4 w-4" />
+                                        </div>
+                                        <div>
+                                            <CardTitle className="text-base font-bold">
+                                                Target Membaca
+                                            </CardTitle>
+                                            <CardDescription className="text-xs">
+                                                Komitmen waktu literasi untuk menjaga konsistensi belajar
+                                            </CardDescription>
+                                        </div>
+                                    </div>
+                                </div>
+                                <SetTargetDialog currentTarget={readingTarget} />
+                            </CardHeader>
+
+                            <CardContent className="pt-2">
+                                {!isConfigured ? (
+                                    <div className="flex flex-col items-center justify-between gap-3 rounded-lg border border-dashed bg-muted/20 p-4 text-center sm:flex-row sm:text-left">
+                                        <div>
+                                            <p className="text-sm font-semibold text-foreground">
+                                                Belum Ada Target Aktif
+                                            </p>
+                                            <p className="text-xs text-muted-foreground">
+                                                Tentukan target harian atau mingguan untuk memantau ritme membaca Anda.
+                                            </p>
+                                        </div>
+                                        <SetTargetDialog
+                                            currentTarget={readingTarget}
+                                            trigger={
+                                                <Button size="sm" className="gap-1.5 whitespace-nowrap">
+                                                    <Target className="h-4 w-4" />
+                                                    Atur Target Sekarang
+                                                </Button>
+                                            }
+                                        />
+                                    </div>
+                                ) : (
+                                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                                        {/* Widget Target Harian */}
+                                        {hasDaily && (
+                                            <div
+                                                className={`rounded-lg border p-4 transition-all ${
+                                                    readingTarget?.daily_achieved
+                                                        ? 'border-emerald-200 bg-emerald-50/40 dark:border-emerald-900/40 dark:bg-emerald-950/10'
+                                                        : 'border-border bg-muted/20'
+                                                }`}
+                                            >
+                                                <div className="flex items-center justify-between">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                                                            Target Hari Ini
+                                                        </span>
+                                                        {readingTarget?.daily_achieved && (
+                                                            <span className="flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
+                                                                <Trophy className="h-3 w-3" /> Tercapai!
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <span className="text-xs font-semibold text-foreground">
+                                                        {readingTarget?.today_minutes ?? 0} / {readingTarget?.daily_target_minutes} mnt
+                                                    </span>
+                                                </div>
+
+                                                <div className="mt-3 space-y-1.5">
+                                                    <div className="flex items-center justify-between text-xs">
+                                                        <span className="text-muted-foreground text-[11px]">
+                                                            Progress
+                                                        </span>
+                                                        <span
+                                                            className={`font-mono font-bold ${
+                                                                readingTarget?.daily_achieved
+                                                                    ? 'text-emerald-600 dark:text-emerald-400'
+                                                                    : 'text-primary'
+                                                            }`}
+                                                        >
+                                                            {readingTarget?.daily_percent ?? 0}%
+                                                        </span>
+                                                    </div>
+                                                    <div className="h-2.5 overflow-hidden rounded-full bg-muted">
+                                                        <div
+                                                            className={`h-full rounded-full transition-all duration-500 ${
+                                                                readingTarget?.daily_achieved
+                                                                    ? 'bg-emerald-500'
+                                                                    : 'bg-primary'
+                                                            }`}
+                                                            style={{
+                                                                width: `${Math.min(readingTarget?.daily_percent ?? 0, 100)}%`,
+                                                            }}
+                                                        />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Widget Target Mingguan */}
+                                        {hasWeekly && (
+                                            <div
+                                                className={`rounded-lg border p-4 transition-all ${
+                                                    readingTarget?.weekly_achieved
+                                                        ? 'border-emerald-200 bg-emerald-50/40 dark:border-emerald-900/40 dark:bg-emerald-950/10'
+                                                        : 'border-border bg-muted/20'
+                                                }`}
+                                            >
+                                                <div className="flex items-center justify-between">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                                                            Target Minggu Ini
+                                                        </span>
+                                                        {readingTarget?.weekly_achieved && (
+                                                            <span className="flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
+                                                                <Trophy className="h-3 w-3" /> Tercapai!
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <span className="text-xs font-semibold text-foreground">
+                                                        {readingTarget?.week_minutes ?? 0} / {readingTarget?.weekly_target_minutes} mnt
+                                                    </span>
+                                                </div>
+
+                                                <div className="mt-3 space-y-1.5">
+                                                    <div className="flex items-center justify-between text-xs">
+                                                        <span className="text-muted-foreground text-[11px]">
+                                                            Progress
+                                                        </span>
+                                                        <span
+                                                            className={`font-mono font-bold ${
+                                                                readingTarget?.weekly_achieved
+                                                                    ? 'text-emerald-600 dark:text-emerald-400'
+                                                                    : 'text-primary'
+                                                            }`}
+                                                        >
+                                                            {readingTarget?.weekly_percent ?? 0}%
+                                                        </span>
+                                                    </div>
+                                                    <div className="h-2.5 overflow-hidden rounded-full bg-muted">
+                                                        <div
+                                                            className={`h-full rounded-full transition-all duration-500 ${
+                                                                readingTarget?.weekly_achieved
+                                                                    ? 'bg-emerald-500'
+                                                                    : 'bg-primary'
+                                                            }`}
+                                                            style={{
+                                                                width: `${Math.min(readingTarget?.weekly_percent ?? 0, 100)}%`,
+                                                            }}
+                                                        />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </CardContent>
+                        </Card>
+                    );
+                })()}
 
                 {/* Join Kelas & Kelas Saya */}
                 <div className="flex flex-col gap-6 ">

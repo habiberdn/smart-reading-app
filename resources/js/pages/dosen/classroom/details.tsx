@@ -42,6 +42,7 @@ interface StudentType {
     name: string;
     readingProgress: string;
     timeSpent: string;
+    totalSessions?: number;
     status: string;
 }
 
@@ -305,6 +306,7 @@ export default function DetailKelas({ classroom, students = [] }: Props) {
                                         <TableHead>Nama Mahasiswa</TableHead>
                                         <TableHead>Progres Membaca</TableHead>
                                         <TableHead>Durasi Membaca</TableHead>
+                                        <TableHead>Sesi Membaca</TableHead>
                                         <TableHead>Status</TableHead>
                                     </TableRow>
                                 </TableHeader>
@@ -312,7 +314,7 @@ export default function DetailKelas({ classroom, students = [] }: Props) {
                                     {students.length === 0 ? (
                                         <TableRow>
                                             <TableCell
-                                                colSpan={5}
+                                                colSpan={6}
                                                 className="py-6 text-center text-sm text-muted-foreground"
                                             >
                                                 Belum ada mahasiswa yang
@@ -352,6 +354,9 @@ export default function DetailKelas({ classroom, students = [] }: Props) {
                                                 </TableCell>
                                                 <TableCell className="text-sm text-muted-foreground">
                                                     {student.timeSpent}
+                                                </TableCell>
+                                                <TableCell className="text-sm font-medium text-foreground">
+                                                    {student.totalSessions ?? 0} sesi
                                                 </TableCell>
                                                 <TableCell>
                                                     {student.status ===

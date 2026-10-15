@@ -470,6 +470,8 @@ function ReadingWorkspaceInner({
     }, [isPlaying, isDosen, doc, totalPages]);
 
     // Visibility Change, Idle Detection & Activity Listeners (Mahasiswa saja)
+    const lastMousePosRef = useRef<{ x: number; y: number } | null>(null);
+
     useEffect(() => {
         if (isDosen) {
             return;
@@ -485,14 +487,29 @@ function ReadingWorkspaceInner({
             lastActivityRef.current = Date.now();
         };
 
-        document.addEventListener('visibilitychange', handleVisibilityChange);
-        window.addEventListener('mousemove', resetIdleTimer);
-        window.addEventListener('mousedown', resetIdleTimer);
-        window.addEventListener('scroll', resetIdleTimer);
-        window.addEventListener('keydown', resetIdleTimer);
-        window.addEventListener('click', resetIdleTimer);
-        window.addEventListener('touchstart', resetIdleTimer);
+        const handleMouseMove = (e: MouseEvent) => {
+            if (!lastMousePosRef.current) {
+                lastMousePosRef.current = { x: e.clientX, y: e.clientY };
+                return;
+            }
+            const dx = Math.abs(e.clientX - lastMousePosRef.current.x);
+            const dy = Math.abs(e.clientY - lastMousePosRef.current.y);
+            // Abaikan micro-jitter / getaran kursor di bawah 4px
+            if (dx > 4 || dy > 4) {
+                lastMousePosRef.current = { x: e.clientX, y: e.clientY };
+                resetIdleTimer();
+            }
+        };
 
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        window.addEventListener('mousemove', handleMouseMove, { passive: true });
+        window.addEventListener('mousedown', resetIdleTimer, { passive: true });
+        window.addEventListener('scroll', resetIdleTimer, { capture: true, passive: true });
+        window.addEventListener('keydown', resetIdleTimer, { passive: true });
+        window.addEventListener('click', resetIdleTimer, { passive: true });
+        window.addEventListener('touchstart', resetIdleTimer, { passive: true });
+
+        // Cek setiap 1 detik apakah idle time mencapai threshold 10 detik
         const idleCheck = setInterval(() => {
             const idleTime = (Date.now() - lastActivityRef.current) / 1000;
 
@@ -500,7 +517,7 @@ function ReadingWorkspaceInner({
                 setIsPlaying(false);
                 setShowIdleDialog(true);
             }
-        }, 2000);
+        }, 1000);
 
         return () => {
             clearInterval(idleCheck);
@@ -508,9 +525,9 @@ function ReadingWorkspaceInner({
                 'visibilitychange',
                 handleVisibilityChange,
             );
-            window.removeEventListener('mousemove', resetIdleTimer);
+            window.removeEventListener('mousemove', handleMouseMove);
             window.removeEventListener('mousedown', resetIdleTimer);
-            window.removeEventListener('scroll', resetIdleTimer);
+            window.removeEventListener('scroll', resetIdleTimer, { capture: true });
             window.removeEventListener('keydown', resetIdleTimer);
             window.removeEventListener('click', resetIdleTimer);
             window.removeEventListener('touchstart', resetIdleTimer);

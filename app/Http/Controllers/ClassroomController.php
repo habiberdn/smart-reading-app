@@ -154,12 +154,18 @@ class ClassroomController extends Controller
                 $status = 'Membaca';
             }
 
+            $totalSessions = \App\Models\ReadingSession::where('mahasiswa_id', $student->id)
+                ->whereIn('assignment_id', $assignmentIds)
+                ->where('is_valid', true)
+                ->count();
+
             return [
                 'id' => $student->id,
                 'nim' => $student->nim ?? '-',
                 'name' => $student->name . ($isJoined ? '' : ' (Luar Kelas)'),
                 'readingProgress' => $avgPercentage . '%',
                 'timeSpent' => $timeSpentStr,
+                'totalSessions' => $totalSessions,
                 'status' => $status,
             ];
         });
