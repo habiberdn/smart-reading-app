@@ -13,10 +13,19 @@ export function useReminders(): void {
             return;
         }
 
+        const currentIds = new Set(reminders.map((r) => r.id));
+        notifiedIdsRef.current.forEach((id) => {
+            if (!currentIds.has(id)) {
+                notifiedIdsRef.current.delete(id);
+            }
+        });
+
         const unnotified = reminders.filter((r) => !notifiedIdsRef.current.has(r.id));
         if (unnotified.length === 0) {
             return;
         }
+
+        const timers: ReturnType<typeof setTimeout>[] = [];
 
         unnotified.forEach((item, index) => {
             notifiedIdsRef.current.add(item.id);
@@ -33,7 +42,6 @@ export function useReminders(): void {
                                 {},
                                 {
                                     preserveScroll: true,
-                                    preserveState: true,
                                 },
                             );
                         },
@@ -41,7 +49,11 @@ export function useReminders(): void {
                 });
             }, (index + 1) * 1200);
 
-            return () => clearTimeout(timer);
+            timers.push(timer);
         });
+
+        return () => {
+            timers.forEach(clearTimeout);
+        };
     }, [reminders]);
 }

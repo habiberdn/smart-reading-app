@@ -79,6 +79,22 @@ class ReadingAssignmentController extends Controller
             'difficulty_score' => $difficultyScore,
         ]);
 
+        // Auto-extract academic glossary terms using Gemini
+        try {
+            $glossaryService = new \App\Services\GeminiGlossaryService();
+            $glossaryService->extractAndStore($assignment);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Glossary extraction failed on upload: ' . $e->getMessage());
+        }
+
+        // Auto-generate quiz questions using Gemini
+        try {
+            $quizService = new \App\Services\GeminiQuizService();
+            $quizService->generateAndStore($assignment, 5);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Quiz generation failed on upload: ' . $e->getMessage());
+        }
+
         return redirect()->back()->with('message', 'Tugas bacaan berhasil ditambahkan!');
     }
 

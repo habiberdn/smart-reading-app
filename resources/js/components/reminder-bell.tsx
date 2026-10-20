@@ -29,7 +29,6 @@ export function ReminderBell() {
             {},
             {
                 preserveScroll: true,
-                preserveState: true,
             },
         );
     };
@@ -40,7 +39,6 @@ export function ReminderBell() {
             {},
             {
                 preserveScroll: true,
-                preserveState: true,
             },
         );
     };

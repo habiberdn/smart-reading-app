@@ -29,16 +29,6 @@ class ReadingSession extends Model
         ];
     }
 
-    protected static function booted(): void
-    {
-        static::updated(function (ReadingSession $session) {
-            // Hanya proses jika sesi baru saja diselesaikan
-            if ($session->isDirty('ended_at') && $session->ended_at !== null) {
-                $session->syncProgress();
-            }
-        });
-    }
-
     // -------------------------------------------------------------------------
     // Relations
     // -------------------------------------------------------------------------

@@ -136,16 +136,15 @@ class MahasiswaController extends Controller
     public function saveProgress(Request $request, string $assignment_id)
     {
         $request->validate([
-            'seconds'      => 'required|integer',
-            'percentage'   => 'required|integer',
+            'seconds'      => 'required|integer|min:0',
+            'percentage'   => 'required|integer|min:0|max:100',
             'current_page' => 'sometimes|integer|min:0',
         ]);
 
         $assignment = ReadingAssignment::findOrFail($assignment_id);
 
-        $joined = $assignment->classroom->mahasiswa()->where('mahasiswa_id', Auth::id())->exists();
-        if (!$joined && !$assignment->is_published) {
-            abort(403, 'Anda tidak memiliki akses ke assignment ini.');
+        if (!$assignment->is_published) {
+            abort(403, 'Tugas bacaan ini belum dipublikasikan.');
         }
 
         \Illuminate\Support\Facades\DB::transaction(function () use ($request, $assignment) {
@@ -247,15 +246,14 @@ class MahasiswaController extends Controller
     public function finishReading(Request $request, string $assignment_id)
     {
         $request->validate([
-            'seconds'      => 'nullable|integer',
-            'percentage'   => 'nullable|integer',
-            'current_page' => 'nullable|integer',
+            'seconds'      => 'nullable|integer|min:0',
+            'percentage'   => 'nullable|integer|min:0|max:100',
+            'current_page' => 'nullable|integer|min:0',
         ]);
 
         $assignment = ReadingAssignment::findOrFail($assignment_id);
-        $joined = $assignment->classroom->mahasiswa()->where('mahasiswa_id', Auth::id())->exists();
-        if (!$joined && !$assignment->is_published) {
-            abort(403, 'Anda tidak memiliki akses ke assignment ini.');
+        if (!$assignment->is_published) {
+            abort(403, 'Tugas bacaan ini belum dipublikasikan.');
         }
 
         $userId = Auth::id();

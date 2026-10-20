@@ -103,6 +103,18 @@ class User extends Authenticatable
         return $this->hasMany(Feedback::class, 'mahasiswa_id');
     }
 
+    /** Riwayat pengerjaan kuis */
+    public function quizAttempts(): HasMany
+    {
+        return $this->hasMany(QuizAttempt::class, 'mahasiswa_id');
+    }
+
+    /** Ringkasan bacaan yang ditulis */
+    public function readingSummaries(): HasMany
+    {
+        return $this->hasMany(ReadingSummary::class, 'mahasiswa_id');
+    }
+
     // -------------------------------------------------------------------------
     // Streak helpers (dihitung dari daily_logs)
     // -------------------------------------------------------------------------

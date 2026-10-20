@@ -1,6 +1,6 @@
 import { useForm } from '@inertiajs/react';
 import { Target, Check } from 'lucide-react';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -38,6 +38,16 @@ export default function SetTargetDialog({
         daily_target_minutes: currentTarget?.daily_target_minutes || 30,
         weekly_target_minutes: currentTarget?.weekly_target_minutes || 150,
     });
+
+    useEffect(() => {
+        if (open) {
+            setData({
+                target_type: currentTarget?.target_type ?? 'daily',
+                daily_target_minutes: currentTarget?.daily_target_minutes || 30,
+                weekly_target_minutes: currentTarget?.weekly_target_minutes || 150,
+            });
+        }
+    }, [currentTarget, open]);
 
     const dailyPresets = [15, 30, 45, 60];
     const weeklyPresets = [60, 120, 180, 300];
@@ -139,11 +149,11 @@ export default function SetTargetDialog({
                                 <Input
                                     id="daily_target_minutes"
                                     type="number"
-                                    min={0}
+                                    min={1}
                                     max={1440}
-                                    value={data.daily_target_minutes}
+                                    value={data.daily_target_minutes || ''}
                                     onChange={(e) =>
-                                        setData('daily_target_minutes', parseInt(e.target.value) || 0)
+                                        setData('daily_target_minutes', e.target.value === '' ? 0 : parseInt(e.target.value) || 0)
                                     }
                                     placeholder="Contoh: 30"
                                     required={data.target_type === 'daily' || data.target_type === 'both'}
@@ -184,11 +194,11 @@ export default function SetTargetDialog({
                                 <Input
                                     id="weekly_target_minutes"
                                     type="number"
-                                    min={0}
+                                    min={1}
                                     max={10080}
-                                    value={data.weekly_target_minutes}
+                                    value={data.weekly_target_minutes || ''}
                                     onChange={(e) =>
-                                        setData('weekly_target_minutes', parseInt(e.target.value) || 0)
+                                        setData('weekly_target_minutes', e.target.value === '' ? 0 : parseInt(e.target.value) || 0)
                                     }
                                     placeholder="Contoh: 150"
                                     required={data.target_type === 'weekly' || data.target_type === 'both'}

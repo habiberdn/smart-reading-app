@@ -95,6 +95,31 @@ class ReadingController extends Controller
             $totalDurasiDetik = $progress->total_durasi_detik ?? 0;
         }
 
+        // Pastikan glosarium terisi (auto-ekstrak jika belum ada data dan teks tersedia)
+        if ($assignment->glossaryTerms()->count() === 0 && !empty($assignment->content)) {
+            try {
+                $service = new \App\Services\GeminiGlossaryService();
+                $service->extractAndStore($assignment);
+            } catch (\Throwable $e) {
+                // ignore error on read view
+            }
+        }
+
+        // Pastikan kuis terisi (auto-generate jika belum ada data dan teks tersedia)
+        if ($assignment->quizQuestions()->count() === 0 && !empty($assignment->content)) {
+            try {
+                $quizService = new \App\Services\GeminiQuizService();
+                $quizService->generateAndStore($assignment, 5);
+            } catch (\Throwable $e) {
+                // ignore error on read view
+            }
+        }
+
+        $glossaryTerms = $assignment->glossaryTerms()
+            ->select(['id', 'term', 'definition', 'category', 'context_sentence', 'frequency'])
+            ->orderByDesc('frequency')
+            ->get();
+
         $document = [
             'id'              => $assignment->id,
             'title'           => $assignment->judul,
@@ -111,10 +136,28 @@ class ReadingController extends Controller
                 'technical_word_count'    => $assignment->technical_word_count ?? 0,
             ],
             'content'         => $assignment->content ? (@iconv('UTF-8', 'UTF-8//IGNORE', $assignment->content) ?: $assignment->content) : '',
+            'glossaryTerms'   => $glossaryTerms,
+            'hasQuiz'         => $assignment->quizQuestions()->exists(),
+            'userRole'        => Auth::user()->role,
         ];
 
         return inertia('dosen/classroom/reading_workspace', [
             'document' => $document
         ]);
     }
+
+    public function regenerateGlossary(int $assignment_id)
+    {
+        $assignment = ReadingAssignment::findOrFail($assignment_id);
+
+        if (Auth::user()->role !== 'dosen' || $assignment->dosen_id !== Auth::id()) {
+            abort(403, 'Hanya dosen pemilik materi yang dapat mengekstrak ulang glosarium.');
+        }
+
+        $service = new \App\Services\GeminiGlossaryService();
+        $service->extractAndStore($assignment);
+
+        return back()->with('message', 'Glosarium akademik berhasil diperbarui oleh AI.');
+    }
 }
+

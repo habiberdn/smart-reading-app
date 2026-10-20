@@ -15,11 +15,18 @@ import {
     ZoomIn,
     X,
     Loader2,
+    Sparkles,
+    Award,
+    HelpCircle,
 } from 'lucide-react';
 import { useState, useEffect, useMemo, useCallback, useRef, Component, type ReactNode } from 'react';
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
 import pdfWorker from 'pdfjs-dist/legacy/build/pdf.worker.min.mjs?url';
 import { Button } from '@/components/ui/button';
+import { AcademicHighlightedText } from '@/components/reading/academic-highlighted-text';
+import { StructuredTextRenderer } from '@/components/reading/structured-text-renderer';
+import { AssessmentModal } from '@/components/reading/assessment-modal';
+import type { GlossaryTerm } from '@/components/reading/vocab-popover';
 
 if (pdfjsLib.GlobalWorkerOptions) {
     pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
@@ -59,6 +66,7 @@ interface DocumentData {
     totalDurasiDetik?: number;
     metrics: Metrics;
     content: string;
+    glossaryTerms?: GlossaryTerm[];
 }
 
 interface User {
@@ -163,6 +171,27 @@ function ReadingWorkspaceInner({
     // Reading tracker state
     const [isPlaying, setIsPlaying] = useState(!isDosen);
     const [secondsSpent, setSecondsSpent] = useState(doc?.totalDurasiDetik || 0);
+
+    // Assessment modal state
+    const [showAssessmentModal, setShowAssessmentModal] = useState(false);
+
+    // Academic glossary highlighting state
+    const [highlightEnabled, setHighlightEnabled] = useState(true);
+    const [isRegeneratingGlossary, setIsRegeneratingGlossary] = useState(false);
+
+    const handleRegenerateGlossary = () => {
+        if (!doc?.id) return;
+        setIsRegeneratingGlossary(true);
+        router.post(
+            `/dosen/assignments/${doc.id}/glossary/regenerate`,
+            {},
+            {
+                preserveScroll: true,
+                preserveState: true,
+                onFinish: () => setIsRegeneratingGlossary(false),
+            }
+        );
+    };
 
     // When PDF finishes loading with actual totalPages, restore page if valid
     useEffect(() => {
@@ -589,8 +618,8 @@ function ReadingWorkspaceInner({
             </Head>
 
             {/* Top Minimalist Header */}
-            <div className="sticky top-0 z-50 flex flex-col justify-between gap-4 border-b bg-background/95 px-6 py-4 backdrop-blur sm:flex-row sm:items-center">
-                <div className="flex items-center gap-4">
+            <div className="sticky top-0 z-50 flex flex-col justify-between gap-3 border-b bg-background/95 px-4 py-3 backdrop-blur sm:flex-row sm:items-center sm:gap-4 sm:px-6 sm:py-4">
+                <div className="flex items-center gap-3 sm:gap-4">
                     <Link
                         href={isDosen ? '#' : '/mahasiswa/dashboard'}
                         onClick={(e) => {
@@ -603,29 +632,29 @@ function ReadingWorkspaceInner({
                                 setShowExitDialog(true);
                             }
                         }}
-                        className="rounded-full border p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                        className="rounded-full border p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground shrink-0"
                     >
                         <ChevronLeft className="h-4 w-4" />
                     </Link>
-                    <div>
+                    <div className="min-w-0">
                         <div className="flex items-center gap-2">
-                            <h1 className="line-clamp-1 text-base font-bold">
+                            <h1 className="line-clamp-1 text-sm sm:text-base font-bold">
                                 {doc.title}
                             </h1>
                             {isDosen && (
-                                <span className="inline-flex items-center gap-1 rounded border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-700">
-                                    Mode Pratinjau Dosen
+                                <span className="inline-flex items-center gap-1 rounded border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] sm:text-xs font-semibold text-amber-700 shrink-0">
+                                    Mode Pratinjau
                                 </span>
                             )}
                         </div>
-                        <p className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
-                            <FileText className="h-3 w-3" /> {doc.fileName}
+                        <p className="mt-0.5 flex items-center gap-1 text-[11px] sm:text-xs text-muted-foreground truncate">
+                            <FileText className="h-3 w-3 shrink-0" /> {doc.fileName}
                         </p>
                     </div>
                 </div>
 
                 {/* Tracker Panel Controls */}
-                <div className="flex flex-wrap items-center gap-3 self-end sm:self-auto">
+                <div className="flex flex-wrap items-center gap-2 sm:gap-3 w-full sm:w-auto justify-start sm:justify-end">
                     {textPages.length > 0 && !!doc?.fileUrl && (
                         <div className="flex items-center rounded-lg border bg-muted/60 p-0.5 text-xs">
                             <button
@@ -643,6 +672,22 @@ function ReadingWorkspaceInner({
                                 <BookOpen className="h-3.5 w-3.5" /> Mode Teks
                             </button>
                         </div>
+                    )}
+
+                    {viewMode === 'text' && (doc?.glossaryTerms?.length || 0) > 0 && (
+                        <button
+                            type="button"
+                            onClick={() => setHighlightEnabled(!highlightEnabled)}
+                            className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-medium transition-all ${
+                                highlightEnabled
+                                    ? 'border-violet-300 bg-violet-50 text-violet-900 shadow-xs dark:border-violet-700/60 dark:bg-violet-950/40 dark:text-violet-200'
+                                    : 'border-muted bg-muted/50 text-muted-foreground hover:text-foreground'
+                            }`}
+                            title="Nyalakan atau matikan sorotan istilah akademik otomatis"
+                        >
+                            <Sparkles className={`h-3.5 w-3.5 ${highlightEnabled ? 'text-violet-600 dark:text-violet-400' : 'text-muted-foreground'}`} />
+                            <span>Sorot Istilah ({doc?.glossaryTerms?.length})</span>
+                        </button>
                     )}
                     {isDosen ? (
                         <div className="flex items-center gap-2 rounded-full border border-amber-500/20 bg-amber-500/10 px-4 py-1.5 text-xs font-medium text-amber-700">
@@ -681,6 +726,17 @@ function ReadingWorkspaceInner({
                             </Button>
                         </>
                     )}
+
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setShowAssessmentModal(true)}
+                        className="gap-1.5 border-emerald-500/40 bg-emerald-50/60 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300 shadow-2xs text-xs font-semibold"
+                    >
+                        <Award className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                        <span className="hidden sm:inline">Kuis & Ringkasan AI</span>
+                        <span className="sm:hidden">Asesmen AI</span>
+                    </Button>
                 </div>
             </div>
 
@@ -694,7 +750,11 @@ function ReadingWorkspaceInner({
                         <CardContent className="px-0 pt-0 pb-0">
                             <div
                                 ref={contentRef}
-                                className="max-h-[70vh] min-h-[65vh] overflow-y-auto px-4 py-6 sm:px-6 md:px-8 lg:px-10"
+                                className={`max-h-[70vh] min-h-[65vh] overflow-y-auto ${
+                                    viewMode === 'text'
+                                        ? 'bg-muted/20 px-3 py-6 sm:px-4 md:px-6 lg:px-8 dark:bg-zinc-900/30'
+                                        : 'px-4 py-6 sm:px-6 md:px-8 lg:px-10'
+                                }`}
                                 style={{ scrollBehavior: 'smooth' }}
                             >
                                 <div
@@ -724,31 +784,13 @@ function ReadingWorkspaceInner({
                                             }
 
                                             return (
-                                                <div className="w-full max-w-3xl space-y-4 py-2 px-1 text-left">
-                                                    {pageText.split(/\n\s*\n/).map((para, pIdx) => {
-                                                        const cleanPara = para.trim();
-                                                        if (!cleanPara) return null;
-
-                                                        const isHeading = cleanPara.length < 90 && (
-                                                            /^(BAB|CHAPTER|Bab|Chapter|\d+\.|\b(ABSTRACT|ABSTRAK|PENDAHULUAN|METODE|HASIL|KESIMPULAN|PEMBAHASAN|REFERENCES|DAFTAR PUSTAKA)\b)/i.test(cleanPara) ||
-                                                            (cleanPara === cleanPara.toUpperCase() && /[A-Z]/.test(cleanPara) && !cleanPara.endsWith('.'))
-                                                        );
-
-                                                        if (isHeading) {
-                                                            return (
-                                                                <h3 key={pIdx} className="pt-3 text-base font-bold text-foreground sm:text-lg">
-                                                                    {cleanPara}
-                                                                </h3>
-                                                            );
-                                                        }
-
-                                                        return (
-                                                            <p key={pIdx} className="text-sm sm:text-base leading-relaxed text-foreground/90 text-justify">
-                                                                {cleanPara}
-                                                            </p>
-                                                        );
-                                                    })}
-                                                </div>
+                                                <StructuredTextRenderer
+                                                    text={pageText}
+                                                    glossaryTerms={doc?.glossaryTerms || []}
+                                                    highlightEnabled={highlightEnabled}
+                                                    pageNumber={currentPage + 1}
+                                                    totalPages={totalPages}
+                                                />
                                             );
                                         }
 
@@ -1123,6 +1165,70 @@ function ReadingWorkspaceInner({
                             </div>
                         </CardContent>
                     </Card>
+
+                    {/* Card Glosarium Akademik Otomatis */}
+                    <Card className="border-violet-200/60 bg-gradient-to-b from-violet-50/30 to-background dark:border-violet-900/40">
+                        <CardHeader className="border-b pb-3">
+                            <div className="flex items-center justify-between">
+                                <CardTitle className="flex items-center gap-1.5 text-sm font-bold text-violet-900 dark:text-violet-200">
+                                    <Sparkles className="h-4 w-4 text-violet-600 dark:text-violet-400" />
+                                    Glosarium Akademik
+                                </CardTitle>
+                                <span className="rounded-full bg-violet-100 dark:bg-violet-950/60 px-2 py-0.5 text-[11px] font-semibold text-violet-800 dark:text-violet-300">
+                                    {doc.glossaryTerms?.length || 0} Istilah
+                                </span>
+                            </div>
+                            <CardDescription className="text-xs">
+                                Didukung AI untuk memahami istilah ilmiah tanpa keluar dari halaman bacaan.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-3 pt-3 text-xs">
+                            <p className="text-muted-foreground leading-relaxed">
+                                Istilah penting di dalam <strong className="text-foreground">Mode Teks</strong> memiliki sorotan khusus. Klik kata bertanda garis bawah untuk melihat definisi dan konteksnya.
+                            </p>
+
+                            {/* Daftar preview beberapa istilah teratas */}
+                            {doc.glossaryTerms && doc.glossaryTerms.length > 0 && (
+                                <div className="space-y-1.5 pt-1">
+                                    <span className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground">
+                                        Istilah Utama Dokumen:
+                                    </span>
+                                    <div className="flex flex-wrap gap-1.5 pt-1">
+                                        {doc.glossaryTerms.slice(0, 6).map((term) => (
+                                             <span
+                                                key={term.id}
+                                                className="inline-flex items-center rounded-md border border-violet-300/60 bg-violet-100/60 px-2 py-0.5 text-[11px] font-medium text-violet-900 dark:border-violet-800/60 dark:bg-violet-950/40 dark:text-violet-200"
+                                            >
+                                                {term.term}
+                                            </span>
+                                        ))}
+                                        {doc.glossaryTerms.length > 6 && (
+                                            <span className="inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                                                +{doc.glossaryTerms.length - 6} lainnya
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Tombol Regenerasi Glosarium Khusus Dosen */}
+                            {isDosen && (
+                                <div className="border-t pt-3 mt-2">
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={handleRegenerateGlossary}
+                                        disabled={isRegeneratingGlossary}
+                                        className="w-full text-xs gap-1.5 border-violet-300 text-violet-900 hover:bg-violet-50 dark:border-violet-800 dark:text-violet-200 dark:hover:bg-violet-950/40"
+                                    >
+                                        <Sparkles className={`h-3.5 w-3.5 ${isRegeneratingGlossary ? 'animate-spin' : ''}`} />
+                                        {isRegeneratingGlossary ? 'Mengekstrak AI...' : 'Ekstrak Ulang Glosarium (AI)'}
+                                    </Button>
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
                 </div>
             </div>
             {/* Session Restore Dialog */}
@@ -1266,6 +1372,15 @@ function ReadingWorkspaceInner({
                     </div>
                 </div>
             )}
+
+            {/* Assessment Modal (Quiz & AI Summary) */}
+            <AssessmentModal
+                open={showAssessmentModal}
+                onOpenChange={setShowAssessmentModal}
+                assignmentId={doc.id}
+                assignmentTitle={doc.title}
+                isDosen={isDosen}
+            />
         </>
     );
 }

@@ -13,9 +13,11 @@ import {
     Check,
     Eye,
     Pencil,
+    HelpCircle,
 } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { ManageQuizDialog } from '@/components/classroom/manage-quiz-dialog';
 import {
     Dialog,
     DialogContent,
@@ -84,6 +86,10 @@ export default function DetailKelas({ classroom, students = [] }: Props) {
     const [dueDate, setDueDate] = useState('');
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
+
+    // Quiz management dialog state
+    const [isQuizDialogOpen, setIsQuizDialogOpen] = useState(false);
+    const [selectedAssignmentForQuiz, setSelectedAssignmentForQuiz] = useState<AssignmentType | null>(null);
 
     // Edit & Delete classroom state
     const [isEditOpen, setEditOpen] = useState(false);
@@ -471,6 +477,18 @@ export default function DetailKelas({ classroom, students = [] }: Props) {
                                             </Button>
                                             <Button
                                                 variant="ghost"
+                                                size="sm"
+                                                className="gap-1.5 text-muted-foreground hover:text-primary"
+                                                onClick={() => {
+                                                    setSelectedAssignmentForQuiz(assignment);
+                                                    setIsQuizDialogOpen(true);
+                                                }}
+                                            >
+                                                <HelpCircle className="h-4 w-4 text-emerald-600" />
+                                                <span className="hidden sm:inline">Kelola Kuis</span>
+                                            </Button>
+                                            <Button
+                                                variant="ghost"
                                                 size="icon"
                                                 className="text-muted-foreground hover:text-destructive"
                                                 onClick={() =>
@@ -642,6 +660,16 @@ export default function DetailKelas({ classroom, students = [] }: Props) {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            {/* MODAL: KELOLA KUIS & REKAP */}
+            {selectedAssignmentForQuiz && (
+                <ManageQuizDialog
+                    open={isQuizDialogOpen}
+                    onOpenChange={setIsQuizDialogOpen}
+                    assignmentId={selectedAssignmentForQuiz.id}
+                    assignmentTitle={selectedAssignmentForQuiz.judul || selectedAssignmentForQuiz.title || ''}
+                />
+            )}
         </>
     );
 }

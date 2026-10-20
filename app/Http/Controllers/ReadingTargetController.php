@@ -33,11 +33,21 @@ class ReadingTargetController extends Controller
      */
     public function update(Request $request): RedirectResponse
     {
-        $validated = $request->validate([
+        $rules = [
+            'target_type'           => 'required|in:daily,weekly,both',
             'daily_target_minutes'  => 'required|integer|min:0|max:1440',
             'weekly_target_minutes' => 'required|integer|min:0|max:10080',
-            'target_type'           => 'required|in:daily,weekly,both',
-        ]);
+        ];
+
+        if (in_array($request->target_type, ['daily', 'both'])) {
+            $rules['daily_target_minutes'] = 'required|integer|min:1|max:1440';
+        }
+
+        if (in_array($request->target_type, ['weekly', 'both'])) {
+            $rules['weekly_target_minutes'] = 'required|integer|min:1|max:10080';
+        }
+
+        $validated = $request->validate($rules);
 
         /** @var \App\Models\User $user */
         $user = Auth::user();

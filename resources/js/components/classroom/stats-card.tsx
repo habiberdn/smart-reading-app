@@ -15,10 +15,10 @@ export default function StatCard({
     accent?: string;
 }) {
     const iconBgMap: Record<string, string> = {
-        primary: 'bg-primary/10',
-        emerald: 'bg-emerald-50',
-        cyan: 'bg-cyan-50',
-        amber: 'bg-amber-50',
+        primary: 'bg-primary/10 text-primary',
+        emerald: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
+        cyan: 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400',
+        amber: 'bg-amber-500/10 text-amber-600 dark:text-amber-400',
     };
 
     return (

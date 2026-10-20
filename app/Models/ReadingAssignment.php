@@ -87,6 +87,30 @@ class ReadingAssignment extends Model
       {
           return $this->hasMany(Feedback::class, 'assignment_id');
       }
+
+      /** Istilah glosarium akademik tugas ini */
+      public function glossaryTerms(): HasMany
+      {
+          return $this->hasMany(GlossaryTerm::class, 'assignment_id');
+      }
+
+      /** Soal-soal kuis pilihan ganda tugas ini */
+      public function quizQuestions(): HasMany
+      {
+          return $this->hasMany(QuizQuestion::class, 'assignment_id')->orderBy('order');
+      }
+
+      /** Riwayat pengerjaan kuis tugas ini */
+      public function quizAttempts(): HasMany
+      {
+          return $this->hasMany(QuizAttempt::class, 'assignment_id');
+      }
+
+      /** Naskah ringkasan dan penilaian AI tugas ini */
+      public function readingSummaries(): HasMany
+      {
+          return $this->hasMany(ReadingSummary::class, 'assignment_id');
+      }
   
       public function scopePublished($query)
       {

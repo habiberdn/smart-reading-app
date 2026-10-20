@@ -9,6 +9,7 @@ use App\Http\Controllers\DosenController;
 use App\Http\Controllers\FeedbackController;
 use App\Http\Controllers\GoogleAuthController;
 use App\Http\Controllers\MahasiswaController;
+use App\Http\Controllers\AssessmentController;
 use App\Http\Controllers\ReadingAssignmentController;
 use App\Http\Controllers\ReadingController;
 use App\Http\Controllers\ReadingTargetController;
@@ -39,6 +40,9 @@ Route::get('/terms-of-service', function () {
 Route::middleware(['auth'])->group(function () {
     Route::get('/read/{assignment_id}', [ReadingController::class, 'show'])->name('reading.workspace');
     Route::get('/read/{assignment_id}/file', [ReadingController::class, 'streamFile'])->name('reading.file');
+    Route::get('/read/{assignment_id}/assessment', [AssessmentController::class, 'getAssessmentData'])->name('assessment.data');
+    Route::post('/read/{assignment_id}/quiz/submit', [AssessmentController::class, 'submitQuiz'])->name('assessment.quiz.submit');
+    Route::post('/read/{assignment_id}/summary/submit', [AssessmentController::class, 'submitSummary'])->name('assessment.summary.submit');
     Route::inertia('/dashboard', 'app')->name('dashboard');
     Route::get('/assignments', [MahasiswaController::class, 'assignmentsList'])->name('assignments');
     Route::get('/explore', [MahasiswaController::class, 'exploreList'])->name('explore');
@@ -56,6 +60,12 @@ Route::middleware(['auth', 'role:dosen'])->prefix('dosen')->name('dosen.')->grou
     Route::delete('/classrooms/{kode}', [ClassroomController::class, 'destroy'])->name('classrooms.destroy');
     Route::post('/classrooms/{kode}/assignments', [ReadingAssignmentController::class, 'store'])->name('classrooms.assignments.store');
     Route::delete('/assignments/{id}', [ReadingAssignmentController::class, 'destroy'])->name('assignments.destroy');
+    Route::post('/assignments/{id}/glossary/regenerate', [ReadingController::class, 'regenerateGlossary'])->name('assignments.glossary.regenerate');
+    Route::get('/assignments/{id}/assessment-recap', [AssessmentController::class, 'getAssessmentRecap'])->name('assignments.assessment.recap');
+    Route::post('/assignments/{id}/quiz/regenerate', [AssessmentController::class, 'regenerateQuiz'])->name('assignments.quiz.regenerate');
+    Route::post('/assignments/{id}/quiz/questions', [AssessmentController::class, 'storeQuestion'])->name('assignments.quiz.questions.store');
+    Route::put('/quiz/questions/{id}', [AssessmentController::class, 'updateQuestion'])->name('quiz.questions.update');
+    Route::delete('/quiz/questions/{id}', [AssessmentController::class, 'destroyQuestion'])->name('quiz.questions.destroy');
 });
 
 // MAHASISWA
@@ -68,8 +78,8 @@ Route::middleware(['auth', 'role:mahasiswa'])->prefix('mahasiswa')->name('mahasi
     Route::get('/classrooms/{kode}', [ClassroomController::class, 'show'])->name('classrooms.show');
     Route::get('/target', [ReadingTargetController::class, 'show'])->name('target.show');
     Route::put('/target', [ReadingTargetController::class, 'update'])->name('target.update');
-    Route::put('/reminders/{feedback}/read', [FeedbackController::class, 'markRead'])->name('reminders.read');
     Route::put('/reminders/read-all', [FeedbackController::class, 'markAllRead'])->name('reminders.read-all');
+    Route::put('/reminders/{feedback}/read', [FeedbackController::class, 'markRead'])->name('reminders.read');
 });
 
 Route::get('/', function () {
